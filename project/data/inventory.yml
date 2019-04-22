@@ -1,4 +1,46 @@
-target:
+- name: lemaitre3
+  hostname: lemaitre3.cism.ucl.ac.be
+  workload_manager: slurm
+  preferred_jobs:
+    - mpi
+- name: nic4
+  hostname: nic4.segi.ulg.ac.be
+  workload_manager: slurm
+  preferred_jobs:
+    - mpi
+- name: vega
+  hostname: vega.ulb.ac.be
+  workload_manager: slurm
+  preferred_jobs:
+    - serial
+    - smp
+    - mpi
+- name: hercules
+  hostname: hercules.ptci.unamur.be
+  workload_manager: slurm
+  preferred_jobs:
+    - serial
+    - smp
+- name: dragon1
+  hostname: dragon1.umons.ac.be
+  workload_manager: slurm
+  preferred_jobs:
+    - serial
+    - smp
+- name: hmem
+  hostname: hmem.cism.ucl.ac.be
+  workload_manager: slurm
+  preferred_jobs:
+    - smp
+- name: zenobe
+  hostname: zenobe.hpc.cenaero.be
+  workload_manager: slurm
+  preferred_jobs:
+    - mpi
+- name: test
   hostname: tfe-server.longree.be
-  username: tux
-  password: test1234=
+  workload_manager: slurm
+  preferred_jobs:
+    - serial
+    - mpi
+    - smp

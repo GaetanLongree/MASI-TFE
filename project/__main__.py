@@ -4,7 +4,16 @@ from project import app
 import sys, getopt
 
 def cmd_helper():
-    return """Usage: app.py -u <user_input_file> OR app.py -m <module_configuration_file>"""
+    return """Usage: 
+    app.py {OPTIONS}
+    
+    Options:
+     
+    -u <file>       Specify a user input file
+        --user <file>
+    -m <file>       (optional) Specify a staging module sequence
+        --module <file>
+    """
 
 def main(argv):
     try:
@@ -13,7 +22,7 @@ def main(argv):
         print(cmd_helper())
         sys.exit(2)
 
-    user_file = None
+    user_file = "E:\\git\\MASI-TFE\\project\\data\\user_input.yml"
     module_file = None
 
     for opt, arg in opts:
@@ -27,8 +36,13 @@ def main(argv):
 
     if user_file is not None:
         print("User input file: {}".format(user_file))
-    elif module_file is not None:
-        print("Modules input file: {}".format(module_file))
+        # TODO Launch staging on User Input only
+
+        app.run(user_file)
+        if module_file is not None:
+            print("Modules input file: {}".format(module_file))
+            # TODO Launch staging w/ user input and staging module sequence
+            app.run(user_file, module_file)
     else:
         print(cmd_helper())
 
