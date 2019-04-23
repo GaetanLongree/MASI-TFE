@@ -27,6 +27,10 @@ class Ssh:
             look_for_keys=False
         )
 
+    def __prep_remote_env__(self, job_uuid):
+        self.run_command('mkdir ' + str(job_uuid))
+        self.remote_path = str(job_uuid) + '/'
+
     def __close__(self):
         if self.client:
             self.client.close()
@@ -34,12 +38,14 @@ class Ssh:
             raise Exception("Cannot run command if no connection has been established")
 
     def __transfer_wrapper__(self):
+        # TODO transfer wrapper to a common directory to all clusters
+        # TODO check if version is latest
         # Compress wrapper into a TAR for easier transfer
         with tarfile.open("wrapper.tar.gz", "w:gz") as tar:
             tar.add(WRAPPER_PATH, arcname=os.path.basename(WRAPPER_PATH))
         if self.client:
             sftp_client = self.client.open_sftp()
-            sftp_client.put('wrapper.tar.gz', 'wrapper.tar.gz')
+            sftp_client.put('wrapper.tar.gz', self.remote_path + 'wrapper.tar.gz')
             sftp_client.close()
         else:
             raise Exception("Cannot run command if no connection has been established")
@@ -47,7 +53,7 @@ class Ssh:
     def __transfer__(self, file_name, path_to_file):
         if self.client:
             sftp_client = self.client.open_sftp()
-            sftp_client.put(path_to_file+file_name, file_name)
+            sftp_client.put(path_to_file+file_name, self.remote_path + file_name)
             sftp_client.close()
         else:
             raise Exception("Cannot run command if no connection has been established")

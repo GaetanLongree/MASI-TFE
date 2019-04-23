@@ -1,6 +1,7 @@
 from project.tools.parser import Parser
 from project.tools.connection import Ssh
 from project.tools.submission import Submission
+from project.tools.dao.submissions import get
 
 
 def run_with_module(user_file, module_file):
@@ -13,6 +14,8 @@ def run(user_file):
     submission.__connect__()
     submission.__run__()
     submission.__close__()
+    print('Your submission ID = {}'.format(submission.uuid))
+    print(get(submission.uuid))
     exit(0)
 
 

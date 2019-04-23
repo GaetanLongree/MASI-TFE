@@ -1,12 +1,15 @@
 import json
+import uuid
 from project import package_directory
 from project.tools.connection import Ssh
 from project.tools.dao.inventory import get_cluster
+from project.tools.dao.submissions import save_user_data
 from project.tools.parser import Parser
 
 class Submission:
     def __init__(self):
         self.connection = None
+        self.uuid = uuid.uuid4()
 
     def __update_user_input__(self, user_input_file):
         user_input = Parser.yaml(user_input_file)
@@ -30,25 +33,32 @@ class Submission:
             self.user_input['username'],
             self.user_input['password'])
         self.connection.__connect__()
+        self.connection.__prep_remote_env__(self.uuid)
 
     def __run__(self):
+        # TODO Run modules if needed
+
         # TODO write USER DATA to file for sending then delete file
         self.__prep_data__()
         with open('input.json', 'w') as file:
             json.dump(self.user_input, file)
+
+        # TODO save data in DB
+        save_user_data(self.uuid, self.user_input)
+
         self.connection.__transfer__('input.json', package_directory + '\\')
         self.connection.__transfer_wrapper__()
-        self.connection.run_command('tar zxf wrapper.tar.gz')
-        self.connection.run_command('python -m wrapper -i input.json')
+        self.connection.run_command('tar zxf ' + str(self.uuid) + '/wrapper.tar.gz -C ' + str(self.uuid) + '/')
+        self.connection.run_command('cd ' + str(self.uuid) + ' \n touch test \n python -m wrapper -i input.json')
 
     def __validate_input__(self, user_input):
         # TODO perform some kind of validation
         return True
 
     def __prep_data__(self):
+        self.user_input['job_uuid'] = str(self.uuid)
         self.user_input['destination_cluster'] = self.target_cluster
         self.user_input['online_job_file'] = self.ONLINE_JOB_FILE
-        pass
 
     def __close__(self):
         self.connection.__close__()

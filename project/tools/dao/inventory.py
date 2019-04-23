@@ -1,5 +1,7 @@
-from project.tools.dao import inventory_db
+from project.tools.dao import inventory_table
+from tinydb import where
 
 
 def get_cluster(cluster_name):
-    return next(item for item in inventory_db if item["name"] == cluster_name)
+    result = inventory_table.get(where('name') == cluster_name)
+    return result

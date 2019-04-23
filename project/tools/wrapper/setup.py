@@ -1,5 +1,8 @@
 import json
 import platform
+import sys
+import subprocess
+
 from . import runtime_info, debug
 
 if __name__ == '__main__':
@@ -26,19 +29,26 @@ def __gather_facts__():
     system_facts['version'] = platform.version()
     runtime_info.__update_facts__(system_facts)
 
-
 def __requirements__():
-    pass
+    subprocess.call(['echo', runtime_info.user_input['password'], '|', 'sudo', '-S', sys.executable, '-m', 'pip', 'install', '-r', 'wrapper/requirements.txt'])
+    # https://stackoverflow.com/questions/44684764/how-to-type-sudo-password-when-using-subprocess-call
+    # p = subprocess.Popen(['sudo', self.resubscribe_script], stdin=subprocess.PIPE)
+    # p.communicate('{}\n'.format(self.sudo_password))
 
-
-def __job__():
+def __prep_job__():
     # TODO assert if job file is local or a git repository
+    import wget
+    if runtime_info.user_input['online_job_file']:
+        wget.download(runtime_info.user_input['job'], 'job.sh')
+        runtime_info.__update_job__('job.sh')
     pass
 
 
 def run(input_file):
     __import_input__(input_file)
+    __requirements__()
     __gather_facts__()
+    __prep_job__()
     debug.log(runtime_info.user_input)
     debug.log(runtime_info.facts)
-    __requirements__()
+    debug.log(runtime_info.job)

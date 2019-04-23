@@ -1,7 +1,7 @@
 import getopt
 import sys
 
-from . import debug, setup
+from . import debug, setup, cleanup, execution
 
 
 def main(argv):
@@ -20,6 +20,8 @@ def main(argv):
     if input_file is not None:
         debug.log("Given input file: " + input_file)
         setup.run(input_file)
+        execution.run()
+        #cleanup.run()
 
 
 if __name__ == '__main__':
