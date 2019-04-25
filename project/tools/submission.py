@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from project import package_directory
 from project.tools.connection import Ssh
@@ -49,7 +50,7 @@ class Submission:
         self.connection.__transfer__('input.json', package_directory + '\\')
         self.connection.__transfer_wrapper__()
         self.connection.run_command('tar zxf ' + str(self.uuid) + '/wrapper.tar.gz -C ' + str(self.uuid) + '/')
-        self.connection.run_command('cd ' + str(self.uuid) + ' \n touch test \n python -m wrapper -i input.json')
+        self.connection.run_command('cd ' + str(self.uuid) + ' \n python -m wrapper -i input.json')
 
     def __validate_input__(self, user_input):
         # TODO perform some kind of validation
@@ -61,4 +62,7 @@ class Submission:
         self.user_input['online_job_file'] = self.ONLINE_JOB_FILE
 
     def __close__(self):
+        # TODO Cleanup files
+        os.remove('input.json')
+        os.remove('wrapper.tar.gz')
         self.connection.__close__()

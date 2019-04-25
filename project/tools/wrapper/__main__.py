@@ -1,5 +1,6 @@
 import getopt
 import sys
+import traceback
 
 from . import debug, setup, cleanup, execution
 
@@ -18,10 +19,13 @@ def main(argv):
             input_file = arg
 
     if input_file is not None:
-        debug.log("Given input file: " + input_file)
-        setup.run(input_file)
-        execution.run()
-        #cleanup.run()
+        try:
+            setup.run(input_file)
+            execution.run()
+            cleanup.run()
+        except Exception as error:
+            debug.log("Error caught: {}".format(error))
+            debug.log("Traceback : {}".format(traceback.format_exc()))
 
 
 if __name__ == '__main__':
