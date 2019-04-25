@@ -4,4 +4,16 @@ user_mail: gaetanlongree@gmail.com
 destination_cluster: test
 job: https://www.longree.be/data/job.sh
 output: result.txt
+resources:
+  nbr_jobs_in_array: 15
+  duration: 1d2h30m
+  nbr_processes: 5
+  nbr_threads_per_process: 2
+  memory_per_thread: 2625M
+  distribution: grouped
+    # grouped | scattered | distributed
+  #if 'distributed'
+  #nbr_of_nodes: 4
+
+
 
