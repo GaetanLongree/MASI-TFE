@@ -18,6 +18,8 @@ def run(user_file):
     print(get(submission.uuid))
     exit(0)
 
+def retrieve(job_uuid):
+    Submission.retrieve_result(job_uuid)
 
 # def run():
 #     inventory = Parser.yaml("data/inventory.yml")

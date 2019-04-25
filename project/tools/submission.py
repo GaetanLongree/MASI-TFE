@@ -3,8 +3,8 @@ import os
 import uuid
 from project import package_directory
 from project.tools.connection import Ssh
-from project.tools.dao.inventory import get_cluster
-from project.tools.dao.submissions import save_user_data
+from project.tools.dao import submissions
+from project.tools.dao import inventory
 from project.tools.parser import Parser
 
 class Submission:
@@ -20,7 +20,7 @@ class Submission:
             raise Exception("Error in the user input file.")
 
         # Find the target cluster from User desired input
-        self.target_cluster = get_cluster(user_input['destination_cluster'])
+        self.target_cluster = inventory.get_cluster(user_input['destination_cluster'])
 
         # Assert if the job file is local or a repository for transfer
         if "http" in self.user_input['job']:
@@ -41,11 +41,11 @@ class Submission:
 
         # TODO write USER DATA to file for sending then delete file
         self.__prep_data__()
-        with open('input.json', 'w') as file:
+        with open(os.path.join(package_directory,'input.json'), 'w') as file:
             json.dump(self.user_input, file)
 
         # TODO save data in DB
-        save_user_data(self.uuid, self.user_input)
+        submissions.save_user_data(self.uuid, self.user_input)
 
         self.connection.__transfer__('input.json', package_directory + '\\')
         self.connection.__transfer_wrapper__()
@@ -63,6 +63,18 @@ class Submission:
 
     def __close__(self):
         # TODO Cleanup files
-        os.remove('input.json')
-        os.remove('wrapper.tar.gz')
+        os.remove(os.path.join(package_directory, 'input.json'))
+        os.remove(os.path.join(package_directory, 'wrapper.tar.gz'))
         self.connection.__close__()
+
+    @staticmethod
+    def retrieve_result(job_uuid):
+        submission = submissions.get(job_uuid)
+        output_filename = submission['user_input']['output']
+        connection = Ssh(
+            submission['user_input']['destination_cluster']['hostname'],
+            submission['user_input']['username'],
+            submission['user_input']['password'])
+        connection.__connect__()
+        connection.__retrieve__(output_filename, job_uuid)
+

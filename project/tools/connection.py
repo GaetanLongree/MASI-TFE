@@ -41,11 +41,11 @@ class Ssh:
         # TODO transfer wrapper to a common directory to all clusters
         # TODO check if version is latest
         # Compress wrapper into a TAR for easier transfer
-        with tarfile.open("wrapper.tar.gz", "w:gz") as tar:
+        with tarfile.open(os.path.join(package_directory,"wrapper.tar.gz"), "w:gz") as tar:
             tar.add(WRAPPER_PATH, arcname=os.path.basename(WRAPPER_PATH))
         if self.client:
             sftp_client = self.client.open_sftp()
-            sftp_client.put('wrapper.tar.gz', self.remote_path + 'wrapper.tar.gz')
+            sftp_client.put(os.path.join(package_directory,"wrapper.tar.gz"), self.remote_path + 'wrapper.tar.gz')
             sftp_client.close()
         else:
             raise Exception("Cannot run command if no connection has been established")
@@ -54,6 +54,18 @@ class Ssh:
         if self.client:
             sftp_client = self.client.open_sftp()
             sftp_client.put(path_to_file+file_name, self.remote_path + file_name)
+            sftp_client.close()
+        else:
+            raise Exception("Cannot run command if no connection has been established")
+
+    def __retrieve__(self, file_name, path_to_file):
+        # local path depends on the local OS in use
+        local = os.path.join(os.getcwd(), file_name)
+        # remote path is assumed as always being UNIX-based
+        remote = path_to_file + '/' + file_name
+        if self.client:
+            sftp_client = self.client.open_sftp()
+            sftp_client.get(remote, local)
             sftp_client.close()
         else:
             raise Exception("Cannot run command if no connection has been established")

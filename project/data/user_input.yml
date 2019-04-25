@@ -3,4 +3,5 @@ password: test1234=
 user_mail: gaetanlongree@gmail.com
 destination_cluster: test
 job: https://www.longree.be/data/job.sh
+output: result.txt
 
