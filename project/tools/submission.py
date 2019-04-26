@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 from project import package_directory
-from project.tools.connection import Ssh
+from project.tools.connection import Ssh, is_reachable
 from project.tools.dao import submissions
 from project.tools.dao import inventory
 from project.tools.parser import Parser
@@ -21,6 +21,8 @@ class Submission:
 
         # Find the target cluster from User desired input
         self.target_cluster = inventory.get_cluster(user_input['destination_cluster'])
+        if self.target_cluster is None:
+            raise Exception("Cluster {} not present in database.".format(user_input['destination_cluster']))
 
         # Assert if the job file is local or a repository for transfer
         if "http" in self.user_input['job']:
@@ -29,11 +31,47 @@ class Submission:
             self.ONLINE_JOB_FILE = False
 
     def __connect__(self):
+        # Done so that new targets don't add additional preferred jobs
+        self.original_target_preferred_jobs = self.target_cluster['preferred_jobs']
+
         self.connection = Ssh(
             self.target_cluster['hostname'],
             self.user_input['username'],
             self.user_input['password'])
-        self.connection.__connect__()
+        # TODO If not reachable, check the original target cluster preferred jobs and offer to user clusters with similar jobs
+        while not self.connection.__connect__():
+            print("Unable to connect to cluster {} ({}), the cluster is unreachable".format(
+                self.target_cluster['name'], self.target_cluster['hostname']))
+            print("Searching for available clusters...")
+
+            # TODO search cluster with similar preferred jobs
+
+            alt_clusters = []
+            for job in self.original_target_preferred_jobs:
+                alt_clusters += inventory.get_cluster_similar_jobs(job)
+
+            # TODO check if alternative are reachable instead of based on current target name
+            alt_clusters = [entry for entry in alt_clusters if is_reachable(entry['hostname'])]
+
+            if len(alt_clusters) == 0:
+                print("No clusters with similar job preferences were found")
+                self.user_input['destination_cluster'] = input("Please enter the name of a new destination cluster: ")
+                self.target_cluster = inventory.get_cluster(self.user_input['destination_cluster'])
+                if self.target_cluster is None:
+                    raise Exception("Cluster {} not present in database.".format(self.user_input['destination_cluster']))
+            else:
+                print("We found clusters with similar job preferences based on your original target")
+                for i in range(0, len(alt_clusters)):
+                    print("\t{} - {} - preferred jobs: {}".format(i+1, alt_clusters[i]['name'], alt_clusters[i]['preferred_jobs']))
+                choice = input("Enter the nbr of the new destination cluster [1-{}]: ".format(len(alt_clusters)))
+                self.target_cluster = alt_clusters[int(choice)-1]
+                self.user_input['destination_cluster'] = self.target_cluster['name']
+
+            self.connection = Ssh(
+                self.target_cluster['hostname'],
+                self.user_input['username'],
+                self.user_input['password'])
+
         self.connection.__prep_remote_env__(self.uuid)
 
     def __run__(self):

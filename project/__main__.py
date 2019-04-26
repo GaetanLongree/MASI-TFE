@@ -13,6 +13,8 @@ def cmd_helper():
         --user <file>
     -m <file>       (optional) Specify a staging module sequence
         --module <file>
+    -r <job UUID>   Retrieve the result from a previously submitted job
+        --retrieve <job UUID>
     """
 
 def main(argv):
