@@ -1,0 +1,26 @@
+staging:
+  1:
+    module: test.c
+    compilation: gcc -o test
+    execution: ./test
+  2:
+    module: resource_estimator.py
+    execution: python resource_estimator.py
+preprocessing:
+  1:
+    module: test_module1
+    compilation: gcc
+    execution: test
+  2:
+    module: test_module2
+    compilation: test
+    execution: test
+postprocessing:
+  1:
+    module: test_module1
+    compilation: gcc
+    execution: test
+  2:
+    module: test_module2
+    compilation: test
+    execution: test

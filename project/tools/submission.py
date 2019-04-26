@@ -7,12 +7,14 @@ from project.tools.dao import submissions
 from project.tools.dao import inventory
 from project.tools.parser import Parser
 
+
 class Submission:
     def __init__(self):
         self.connection = None
         self.uuid = uuid.uuid4()
+        self.user_input = None
 
-    def __update_user_input__(self, user_input_file):
+    def __import_user_input__(self, user_input_file):
         user_input = Parser.yaml(user_input_file)
         if self.__validate_input__(user_input):
             self.user_input = user_input
@@ -29,6 +31,10 @@ class Submission:
             self.ONLINE_JOB_FILE = True
         else:
             self.ONLINE_JOB_FILE = False
+
+    def update_input(self, input_dict):
+        if self.__validate_input__(input_dict):
+            self.user_input = input_dict
 
     def __connect__(self):
         # Done so that new targets don't add additional preferred jobs
@@ -58,13 +64,15 @@ class Submission:
                 self.user_input['destination_cluster'] = input("Please enter the name of a new destination cluster: ")
                 self.target_cluster = inventory.get_cluster(self.user_input['destination_cluster'])
                 if self.target_cluster is None:
-                    raise Exception("Cluster {} not present in database.".format(self.user_input['destination_cluster']))
+                    raise Exception(
+                        "Cluster {} not present in database.".format(self.user_input['destination_cluster']))
             else:
                 print("We found clusters with similar job preferences based on your original target")
                 for i in range(0, len(alt_clusters)):
-                    print("\t{} - {} - preferred jobs: {}".format(i+1, alt_clusters[i]['name'], alt_clusters[i]['preferred_jobs']))
+                    print("\t{} - {} - preferred jobs: {}".format(i + 1, alt_clusters[i]['name'],
+                                                                  alt_clusters[i]['preferred_jobs']))
                 choice = input("Enter the nbr of the new destination cluster [1-{}]: ".format(len(alt_clusters)))
-                self.target_cluster = alt_clusters[int(choice)-1]
+                self.target_cluster = alt_clusters[int(choice) - 1]
                 self.user_input['destination_cluster'] = self.target_cluster['name']
 
             self.connection = Ssh(
@@ -79,13 +87,13 @@ class Submission:
 
         # TODO write USER DATA to file for sending then delete file
         self.__prep_data__()
-        with open(os.path.join(package_directory,'input.json'), 'w') as file:
+        with open(os.path.join(package_directory, 'input.json'), 'w') as file:
             json.dump(self.user_input, file)
 
         # TODO save data in DB
         submissions.save_user_data(self.uuid, self.user_input)
 
-        self.connection.__transfer__('input.json', package_directory + '\\')
+        self.connection.__transfer__('input.json', os.path.join(package_directory,''))
         self.connection.__transfer_wrapper__()
         self.connection.run_command('tar zxf ' + str(self.uuid) + '/wrapper.tar.gz -C ' + str(self.uuid) + '/')
         self.connection.run_command('cd ' + str(self.uuid) + ' \n python -m wrapper -i input.json')
@@ -115,4 +123,3 @@ class Submission:
             submission['user_input']['password'])
         connection.__connect__()
         connection.__retrieve__(output_filename, job_uuid)
-

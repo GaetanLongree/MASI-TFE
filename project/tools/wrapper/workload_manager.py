@@ -48,6 +48,7 @@ def parse_mem(param):
 
 
 def __slurm__(resources):
+    # TODO handle if resources are empty
     # Based on the existing tool at http://www.ceci-hpc.be/scriptgen.html
     script = "#!/bin/bash\n"
     # Job Name == Job UUID
