@@ -30,10 +30,15 @@ def __gather_facts__():
     runtime_info.__update_facts__(system_facts)
 
 def __requirements__():
-    cmd = 'sudo -S ' + sys.executable + ' -m pip install -r wrapper/requirements.txt'
-    # https://stackoverflow.com/questions/44684764/how-to-type-sudo-password-when-using-subprocess-call
-    p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
-    out, err = p.communicate('{}\n'.format(runtime_info.user_input['password']))
+    if runtime_info.user_input['destination_cluster']['name'] == 'test':
+        cmd = 'sudo -S ' + sys.executable + ' -m pip install -r wrapper/requirements.txt'
+        # https://stackoverflow.com/questions/44684764/how-to-type-sudo-password-when-using-subprocess-call
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, shell=True)
+        out, err = p.communicate('{}\n'.format(runtime_info.user_input['password']))
+    else:
+        cmd = 'pip install --user -r wrapper/requirements.txt'
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+        out, err = p.communicate()
     debug.log(str(out))
 
 def __prep_job__():
