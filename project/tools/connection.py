@@ -103,6 +103,6 @@ class Ssh:
                     result = stdout.channel.recv(1024)
                     while stdout.channel.recv_ready():
                         result += stdout.channel.recv(1024)
-                    return str(result, 'utf8')
+                    return str(result)
         else:
             raise Exception("Cannot run command if no connection has been established")

@@ -8,19 +8,17 @@ staging:
     execution: python resource_estimator.py
 preprocessing:
   1:
-    module: test_module1
-    compilation: gcc
-    execution: test
+    module: remote_test.c
+    compilation: gcc -o remote_test
+    execution: ./remote_test
   2:
-    module: test_module2
-    compilation: test
-    execution: test
+    module: resource_estimator.py
+    execution: python resource_estimator.py
 postprocessing:
   1:
-    module: test_module1
-    compilation: gcc
-    execution: test
+    module: test.c
+    compilation: gcc -o test
+    execution: ./test
   2:
-    module: test_module2
-    compilation: test
-    execution: test
+    module: remote_test.py
+    execution: python remote_test.py

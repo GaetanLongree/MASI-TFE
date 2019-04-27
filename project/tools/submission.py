@@ -13,6 +13,7 @@ class Submission:
         self.connection = None
         self.uuid = uuid.uuid4()
         self.user_input = None
+        self.modules = None
 
     def __import_user_input__(self, user_input_file):
         user_input = Parser.yaml(user_input_file)
@@ -35,6 +36,9 @@ class Submission:
     def update_input(self, input_dict):
         if self.__validate_input__(input_dict):
             self.user_input = input_dict
+
+    def import_modules(self, modules):
+        self.modules = modules
 
     def __connect__(self):
         # Done so that new targets don't add additional preferred jobs
@@ -83,19 +87,21 @@ class Submission:
         self.connection.__prep_remote_env__(self.uuid)
 
     def __run__(self):
-        # TODO Run modules if needed
-
         # TODO write USER DATA to file for sending then delete file
         self.__prep_data__()
         with open(os.path.join(package_directory, 'input.json'), 'w') as file:
-            json.dump(self.user_input, file)
+            #json.dump(self.user_input, file)
+            print(self.user_input)
+            file.write(json.dumps(self.user_input))
 
         # TODO save data in DB
-        submissions.save_user_data(self.uuid, self.user_input)
+        submissions.save_user_data(self.uuid, self.user_input) # TODO fix modules not being saved in the DB
 
         self.connection.__transfer__('input.json', os.path.join(package_directory,''))
         self.connection.__transfer_wrapper__()
         self.connection.run_command('tar zxf ' + str(self.uuid) + '/wrapper.tar.gz -C ' + str(self.uuid) + '/')
+        # pip install must be run in foreground to install dependencies
+        self.connection.run_command_foreground('pip install --user -r ' + str(self.uuid) + '/wrapper/requirements.txt')
         self.connection.run_command('cd ' + str(self.uuid) + ' \n python -m wrapper -i input.json')
 
     def __validate_input__(self, user_input):
@@ -105,6 +111,7 @@ class Submission:
     def __prep_data__(self):
         self.user_input['job_uuid'] = str(self.uuid)
         self.user_input['destination_cluster'] = self.target_cluster
+        #self.user_input['modules'] = self.modules
         self.user_input['online_job_file'] = self.ONLINE_JOB_FILE
 
     def __close__(self):

@@ -1,3 +1,5 @@
+import json
+
 from project.tools.module_handler import ModuleHandler
 from project.tools.parser import Parser
 from project.tools.connection import Ssh
@@ -11,11 +13,16 @@ def run_with_module(user_file, module_file):
 
     # Execute module handling
     # Staging
-    handler = ModuleHandler(module_file)
+    handler = ModuleHandler()
+    handler.from_yaml(module_file)
     aggregated_input = handler.run('staging', submission.user_input)
-    print(aggregated_input)
+    print("##### Aggragated input #####")
+    print(json.dumps(aggregated_input))
     submission.update_input(aggregated_input)
-    # Perpare for pre- and post- modules execution on cluster
+    print("##### Updated input #####")
+    print(json.dumps(submission.user_input))
+    #submission.import_modules(handler.__modules__)
+    # Prepare for pre- and post- modules execution on cluster
     handler.prep_remote()
 
     submission.__connect__()
