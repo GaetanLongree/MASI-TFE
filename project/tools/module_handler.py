@@ -57,7 +57,8 @@ class ModuleHandler:
         else:
             return output
 
-    def run(self, stage, user_input):
+    def run(self, stage, input):
+        out = dict()
         for i in range(1, len(self.__modules__[stage]) + 1):
             try:
                 module = self.__modules__[stage][i]
@@ -71,7 +72,7 @@ class ModuleHandler:
                 output = self.__exec_cmd__(compilation_cmd, stage, module)
 
             # run the module based on execution
-            execution_cmd = module['execution'] + " '" + json.dumps(user_input) + "'"
+            execution_cmd = module['execution'] + " '" + json.dumps(input) + "'"
             output = self.__exec_cmd__(execution_cmd, stage, module)
 
             # TODO parse the command output to add to the user_input
@@ -80,10 +81,11 @@ class ModuleHandler:
             except KeyError:
                 self.__modules__[stage][str(i)]['module_output'] = json.loads(output)
 
-            user_input = json.loads(output)
+            input = json.loads(output)
 
-        user_input['modules'] = self.__modules__
-        return user_input
+        out['input'] = input
+        out['modules'] = self.__modules__
+        return out
 
     def prep_remote(self):
         # TODO to do lel

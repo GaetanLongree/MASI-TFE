@@ -15,21 +15,18 @@ def run_with_module(user_file, module_file):
     # Staging
     handler = ModuleHandler()
     handler.from_yaml(module_file)
-    aggregated_input = handler.run('staging', submission.user_input)
-    print("##### Aggragated input #####")
-    print(json.dumps(aggregated_input))
-    submission.update_input(aggregated_input)
-    print("##### Updated input #####")
-    print(json.dumps(submission.user_input))
-    #submission.import_modules(handler.__modules__)
+    aggregated_input = handler.run('staging', submission.input)
+    submission.update_input(aggregated_input['input'])
+    submission.import_modules(aggregated_input['modules'])
+
     # Prepare for pre- and post- modules execution on cluster
     handler.prep_remote()
 
     submission.__connect__()
     submission.__run__()
     submission.__close__()
-    print('Your submission ID = {}'.format(submission.uuid))
-    print(get(submission.uuid))
+    print('Your submission ID = {}'.format(submission.job_uuid))
+    print(json.dumps(get(submission.job_uuid)))
     exit(0)
 
 
@@ -39,8 +36,8 @@ def run(user_file):
     submission.__connect__()
     submission.__run__()
     submission.__close__()
-    print('Your submission ID = {}'.format(submission.uuid))
-    print(get(submission.uuid))
+    print('Your submission ID = {}'.format(submission.job_uuid))
+    print(json.dumps(get(submission.job_uuid)))
     exit(0)
 
 

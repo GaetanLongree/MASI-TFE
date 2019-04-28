@@ -6,7 +6,7 @@ from . import runtime_info
 def log(string):
     timestamp = time.asctime()
     if runtime_info.user_input:
-        log = '[' + timestamp + '] - [' + str(runtime_info.user_input['job_uuid']) + '] - ' + str(string) + '\n'
+        log = '[' + timestamp + '] - [' + str(runtime_info.job_uuid) + '] - ' + str(string) + '\n'
     else:
         log = '[' + timestamp + '] - ' + str(string) + '\n'
     tmp = open("/tmp/debug.log", "a+")

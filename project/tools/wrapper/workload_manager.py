@@ -52,7 +52,7 @@ def __slurm__(resources):
     # Based on the existing tool at http://www.ceci-hpc.be/scriptgen.html
     script = "#!/bin/bash\n"
     # Job Name == Job UUID
-    script = script + "#SBATCH --job-name=" + runtime_info.user_input['job_uuid'] + "\n"
+    script = script + "#SBATCH --job-name=" + runtime_info.job_uuid + "\n"
 
     # Job duration
     timestamp = parse_duration(resources['duration'])
@@ -87,7 +87,7 @@ def __slurm__(resources):
         script = script + "#SBATCH --mem-per-cpu=" + str(memory) + "\n"
         
     # Cluster specific values
-    script = script + "#SBATCH --partition=" + runtime_info.user_input['destination_cluster']['partition'] + "\n"
+    script = script + "#SBATCH --partition=" + runtime_info.destination_cluster['partition'] + "\n"
 
     # Final values
     if 'nbr_threads_per_process' in resources:

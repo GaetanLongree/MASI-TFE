@@ -4,7 +4,7 @@ import subprocess
 
 def run():
     # TODO create execution script based on workload manager used and resources requested
-    script = workload_manager.parse(runtime_info.user_input['destination_cluster']['workload_manager'],
+    script = workload_manager.parse(runtime_info.destination_cluster['workload_manager'],
                                     runtime_info.user_input['resources'])
     debug.log(script)
     if 'file' in runtime_info.job:
