@@ -1,3 +1,4 @@
 paramiko
 pyyaml
 tinydb
+numpy

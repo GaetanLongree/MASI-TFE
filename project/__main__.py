@@ -13,6 +13,8 @@ def cmd_helper():
         --user <file>
     -m <file>       (optional) Specify a staging module sequence
         --module <file>
+    -r <job UUID>   Retrieve the result from a previously submitted job
+        --retrieve <job UUID>
     """
 
 def main(argv):
@@ -32,21 +34,22 @@ def main(argv):
         if opt == '-h':
             #print(cmd_helper())
             sys.exit()
-        elif opt in ("-u", "--user"):
+        if opt in ("-u", "--user"):
             user_file = os.path.normpath(arg)
-        elif opt in ("-m", "--module"):
+        if opt in ("-m", "--module"):
             module_file = os.path.normpath(arg)
-        elif opt in ("-r", "--retrieve"):
+        if opt in ("-r", "--retrieve"):
             job_uuid = str(arg)
 
     if user_file is not None:
         print("User input file: {}".format(user_file))
-        # TODO Launch staging on User Input only
-        app.run(user_file)
         if module_file is not None:
             print("Modules input file: {}".format(module_file))
             # TODO Launch staging w/ user input and staging module sequence
-            app.run(user_file, module_file)
+            app.run_with_module(user_file, module_file)
+        else:
+            # TODO Launch staging on User Input only
+            app.run(user_file)
     elif job_uuid is not None:
         app.retrieve(job_uuid)
     else:

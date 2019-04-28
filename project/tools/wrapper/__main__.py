@@ -1,8 +1,9 @@
 import getopt
+import json
 import sys
 import traceback
 
-from . import debug, setup, cleanup, execution
+from . import debug, setup, cleanup, execution, runtime_info ,module_handler
 
 
 def main(argv):
@@ -20,9 +21,31 @@ def main(argv):
 
     if input_file is not None:
         try:
+            # Setup stage
             setup.run(input_file)
+
+            # Module handling setup
+            handler = module_handler.ModuleHandler()
+            handler.from_dict(runtime_info.modules)
+
+            # Preprocessing modules execution
+            preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
+            runtime_info.__update_input__(preprocessing_output['input'])
+            runtime_info.__update_modules__(preprocessing_output['modules'])
+
+            # Job Execution
             execution.run()
-            cleanup.run()
+            # TODO wait for slurm to finish running the job
+
+            # Postprocessing modules execution
+            postprocessing_output = handler.run('postprocessing', runtime_info.user_input)
+            runtime_info.__update_input__(postprocessing_output['input'])
+            runtime_info.__update_modules__(postprocessing_output['modules'])
+
+            # Cleanup of local files
+            #cleanup.run()
+            cleanup.write_file_output(runtime_info.get_all())
+            debug.log("\n" + json.dumps(runtime_info.get_all(), indent=6, sort_keys=True))
         except Exception as error:
             debug.log("Error caught: {}".format(error))
             debug.log("Traceback : {}".format(traceback.format_exc()))
