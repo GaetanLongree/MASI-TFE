@@ -3,7 +3,7 @@ import json
 import sys
 import traceback
 
-from . import debug, setup, cleanup, execution, runtime_info ,module_handler
+from . import debug, setup, cleanup, execution, runtime_info, workload_manager, module_handler
 
 
 def main(argv):
@@ -36,6 +36,7 @@ def main(argv):
             # Job Execution
             execution.run()
             # TODO wait for slurm to finish running the job
+            execution.wait()
 
             # Postprocessing modules execution
             postprocessing_output = handler.run('postprocessing', runtime_info.user_input)

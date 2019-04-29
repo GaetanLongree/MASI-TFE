@@ -23,20 +23,19 @@ def __import_input__(input_file):
 
 
 def __gather_facts__():
-    system_facts = {}
-    system_facts['platform'] = platform.platform()
-    system_facts['system'] = platform.system()
-    system_facts['release'] = platform.release()
-    system_facts['version'] = platform.version()
-    runtime_info.__update_facts__(system_facts)
+    facts = dict()
+    os = dict()
+    os['platform'] = platform.platform()
+    os['system'] = platform.system()
+    os['release'] = platform.release()
+    os['version'] = platform.version()
 
-# DEPRECATED
-# def __requirements__():
-#     cmd = 'pip install --user -r wrapper/requirements.txt'
-#     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
-#     out, err = p.communicate()
-#     # debug.log(str(out))
-#     # debug.log(str(err))
+    facts['os'] = os
+    # TODO uncomment once testing to prod
+    #if runtime_info.destination_cluster['workload_manager'] == 'slurm':
+    #    facts['cluster'] = workload_manager.Slurm.get_cluster_resources()
+
+    runtime_info.__update_facts__(facts)
 
 def __prep_job__():
     # TODO assert if job file is local or a git repository

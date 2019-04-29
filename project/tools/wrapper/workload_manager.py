@@ -1,4 +1,8 @@
-from . import runtime_info
+import shlex
+import subprocess
+import time
+
+from . import runtime_info, debug
 import re
 
 def parse(workload_manager, resources):
@@ -98,3 +102,83 @@ def __slurm__(resources):
 
     return script
 
+class Slurm(object):
+    @staticmethod
+    def get_cluster_resources():
+        process = subprocess.Popen(shlex.split('sinfo -N --format="%N;%a;%b;%c;%z;%O;%m;%e"'),
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, err = process.communicate()
+        return_code = process.returncode
+
+        if return_code == 0:
+            output = output.split('\n')
+            cluster = dict()
+            nodes = dict()
+            for row, i in zip(output, range(0, len(output))):
+                output[i] = row.split(';')
+
+            for i in range(1, len(output[0])):
+                for row in output[1:]:
+                    try:
+                        nodes[row[0]][output[0][i]] = row[i]
+                    except KeyError:
+                        nodes[row[0]] = dict()
+                        nodes[row[0]][output[0][i]] = row[i]
+
+            # Get sum of all nodes numerical nodes for the entire cluster
+            for key in nodes.keys():
+                if nodes[key]["AVAIL"] == "up":
+                    for subkey in nodes[key].keys():
+                        if subkey is not "AVAIL":
+                            try:
+                                cluster[subkey] = cluster[subkey] + float(nodes[key][subkey])
+                            except KeyError:
+                                cluster[subkey] = 0
+                                try:
+                                    cluster[subkey] = cluster[subkey] + float(nodes[key][subkey])
+                                except ValueError:
+                                    del cluster[subkey]
+                            except ValueError:
+                                pass
+                    try:
+                        cluster['AVAIL'] = cluster['AVAIL'] + 1
+                    except KeyError:
+                        cluster['AVAIL'] = 0
+                        cluster['AVAIL'] = cluster['AVAIL'] + 1
+
+            cluster['CPU_LOAD'] = cluster['CPU_LOAD'] / len(nodes)
+            cluster['TOTAL_NODES'] = len(nodes)
+            cluster['NODES'] = nodes
+            cluster['TIMESTAMP'] = time.time()
+
+            return cluster
+        else:
+            debug.log("ERROR: Gathering Slurm cluster stats returned non-zero error code.")
+
+    @staticmethod
+    def get_job_status():
+        process = subprocess.Popen(shlex.split('squeue --name=' + runtime_info.job_uuid + \
+                                               ' --format="%j;%A;%j;%D;%C;%m;%l;%N;%o;%T;%r"'),
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, err = process.communicate()
+        return_code = process.returncode
+
+        if return_code == 0:
+            output = output.split('\n')
+            job_submission = dict()
+            for row, i in zip(output, range(0, len(output))):
+                output[i] = row.split(';')
+
+            for i in range(1, len(output[0])):
+                for row in output[1:]:
+                    if row[0] is not "":
+                        try:
+                            job_submission[row[0]][output[0][i]].append(row[i])
+                        except KeyError:
+                            if row[0] not in job_submission:
+                                job_submission[row[0]] = dict()
+                            if output[0][i] not in job_submission[row[0]]:
+                                job_submission[row[0]][output[0][i]] = list()
+                                job_submission[row[0]][output[0][i]].append(row[i])
+
+            return job_submission
