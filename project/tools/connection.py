@@ -59,6 +59,7 @@ class Ssh:
         # Compress wrapper into a TAR for easier transfer
         with tarfile.open(os.path.join(package_directory, "wrapper.tar.gz"), "w:gz") as tar:
             tar.add(WRAPPER_PATH, arcname=os.path.basename(WRAPPER_PATH))
+            tar.close()
         if self.client:
             sftp_client = self.client.open_sftp()
             sftp_client.put(os.path.join(package_directory, "wrapper.tar.gz"), self.remote_path + 'wrapper.tar.gz')
@@ -69,8 +70,9 @@ class Ssh:
     def __transfer__(self, file_name, path_to_file):
         if self.client:
             sftp_client = self.client.open_sftp()
-            sftp_client.put(path_to_file + file_name, self.remote_path + file_name)
+            out = sftp_client.put(os.path.join(path_to_file, file_name), self.remote_path + file_name)
             sftp_client.close()
+            return out
         else:
             raise Exception("Cannot run command if no connection has been established")
 

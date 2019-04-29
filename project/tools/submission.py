@@ -1,7 +1,8 @@
 import json
 import os
+import tarfile
 import uuid
-from project import package_directory
+from project import package_directory, current_directory
 from project.tools.connection import Ssh, is_reachable
 from project.tools.dao import submissions
 from project.tools.dao import inventory
@@ -13,6 +14,7 @@ class Submission:
         self.connection = None
         self.job_uuid = uuid.uuid4()
         self.ONLINE_JOB_FILE = None
+        self.TAR_FILE = None
         self.input = None
         self.destination_cluster = None
         self.modules = None
@@ -90,14 +92,29 @@ class Submission:
         self.connection.__prep_remote_env__(self.job_uuid)
 
     def __run__(self):
-        # TODO write USER DATA to file for sending then delete file
-        self.__prep_data__()
-        with open(os.path.join(package_directory, 'input.json'), 'w') as file:
-            #json.dump(self.user_input, file)
-            file.write(json.dumps(self.aggregated_data))
 
+        # TODO check if job is a local file or a directory
+        if not self.ONLINE_JOB_FILE:
+            if os.path.isdir(self.input['job']):
+                # TODO TAR the dir
+                self.TAR_FILE = True
+                with tarfile.open(os.path.join(current_directory, self.input['job']+".tar.gz"), "w:gz") as tar:
+                    tar.add(os.path.join(current_directory, self.input['job']),
+                            os.path.basename(os.path.join(current_directory, self.input['job'])))
+                    tar.close()
+                    self.connection.__transfer__(self.input['job']+".tar.gz", current_directory)
+            else:
+                self.TAR_FILE = False
+                self.connection.__transfer__(self.input['job'], current_directory)
+
+        self.__prep_data__()
         # TODO save data in DB
-        submissions.save_user_data(self.job_uuid, self.aggregated_data) # TODO fix modules not being saved in the DB
+        submissions.save_user_data(self.job_uuid, self.aggregated_data)
+
+        # TODO write USER DATA to file for sending then delete file
+        with open(os.path.join(package_directory, 'input.json'), 'w') as file:
+            # json.dump(self.user_input, file)
+            file.write(json.dumps(self.aggregated_data))
 
         self.connection.__transfer__('input.json', os.path.join(package_directory,''))
         self.connection.__transfer_wrapper__()
@@ -116,6 +133,7 @@ class Submission:
         self.aggregated_data['destination_cluster'] = self.destination_cluster
         self.aggregated_data['modules'] = self.modules
         self.aggregated_data['online_job_file'] = self.ONLINE_JOB_FILE
+        self.aggregated_data['tar_file'] = self.TAR_FILE
 
     def __close__(self):
         # TODO Cleanup files

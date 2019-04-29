@@ -1,5 +1,7 @@
-from . import runtime_info, workload_manager, debug
+import os
+import shlex
 import subprocess
+from . import runtime_info, workload_manager, debug
 
 
 def run():
@@ -7,9 +9,19 @@ def run():
     script = workload_manager.parse(runtime_info.destination_cluster['workload_manager'],
                                     runtime_info.user_input['resources'])
     debug.log(script)
-    if 'file' in runtime_info.job:
-        subprocess.call('chmod +x ' + runtime_info.job['file'], shell=True)
-        subprocess.call('./' + runtime_info.job['file'], shell=True)
+    if 'execution' in runtime_info.user_input:
+        process = subprocess.Popen(shlex.split(runtime_info.user_input['execution']),
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, err = process.communicate()
+        return_code = process.returncode
+        if return_code is not 0:
+            debug.log("ERROR: running execution command {} returned a non-zero return code" + \
+                      "\nOutput: {}" + \
+                      "\nError: {}".format(runtime_info.user_input['execution'], output, err))
+            raise Exception("ERROR: running execution command {} returned a non-zero return code".format(
+                                runtime_info.user_input['execution']))
+
+
 def wait():
     # TODO continusouly get the job status and check for the job state (or states if in array)
     job_status = workload_manager.Slurm.get_job_status()
