@@ -2,15 +2,20 @@ import shlex
 import subprocess
 import time
 
+import numpy
+
 from . import runtime_info, debug
 import re
 
-def parse(workload_manager, resources):
+def get(workload_manager):
     if workload_manager == 'slurm':
-        script = __slurm__(resources)
+        return Slurm
     else:
         raise Exception("Unknown workload manager: {}".format(workload_manager))
-    return script
+
+
+def parse(workload_manager, destination_cluster, resources, commands):
+    return get(workload_manager).create_script(destination_cluster, resources, commands)
 
 
 def parse_duration(param):
@@ -51,58 +56,15 @@ def parse_mem(param):
     return mem
 
 
-def __slurm__(resources):
-    # TODO handle if resources are empty
-    # Based on the existing tool at http://www.ceci-hpc.be/scriptgen.html
-    script = "#!/bin/bash\n"
-    # Job Name == Job UUID
-    script = script + "#SBATCH --job-name=" + runtime_info.job_uuid + "\n"
-
-    # Job duration
-    timestamp = parse_duration(resources['duration'])
-    if 'nbr_jobs_in_array' in resources:
-        script = script + "#SBATCH --time=" + timestamp + "\n"
-
-    # Embarrassingly parallel jobs
-    if 'nbr_jobs_in_array' in resources:
-        script = script + "#SBATCH --array=1-" + str(resources['nbr_jobs_in_array']) + "\n"
-
-    # Shared Memory / OpenMP jobs
-    if 'nbr_threads_per_process' in resources:
-        script = script + "#SBATCH --cpus-per-task=" + str(resources['nbr_threads_per_process']) + "\n"
-
-    # Message passing / MPI jobs
-    if 'nbr_processes' in resources:
-        script = script + "#SBATCH --ntasks=" + str(resources['nbr_processes']) + "\n"
-        if 'distribution' in resources:
-            if resources['distribution'] == 'grouped':
-                script = script + "#SBATCH --nodes=1\n"
-            elif resources['distribution'] == 'scattered':
-                script = script + "#SBATCH --ntasks-per-node=1\n"
-            elif resources['distribution'] == 'distributed' and 'nbr_of_nodes' in resources:
-                script = script + "#SBATCH --ntasks-per-node=1\n"
-                script = script + "#SBATCH --nodes=" + str(resources['nbr_of_nodes']) + "\n"
-    else:
-        script = script + "#SBATCH --ntasks=1\n"
-
-    # Memory
-    memory = parse_mem(resources['memory_per_thread'])
-    if 'nbr_jobs_in_array' in resources:
-        script = script + "#SBATCH --mem-per-cpu=" + str(memory) + "\n"
-        
-    # Cluster specific values
-    script = script + "#SBATCH --partition=" + runtime_info.destination_cluster['partition'] + "\n"
-
-    # Final values
-    if 'nbr_threads_per_process' in resources:
-        script = script + "export OMP_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n" \
-                        + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
-    if 'nbr_jobs_in_array' in resources:
-        script = script + "echo 'Task ID: $SLURM_ARRAY_TASK_ID'\n"
-
-    return script
-
 class Slurm(object):
+    TERMINATED_STATUSES = ("BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL",
+                           "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT")
+    TERMINATED_SUCCESSFULLY_STATUSES = ("COMPLETED", )
+    WAITING_STATUSES = ("PENDING", "CONFIGURING")
+    RUNNING_STATUSES = ("RUNNING", )
+    EVENT_STATUSES = ("COMPLETING", "RESV_DEL_HOLD", "REQUEUE_FED", "REQUEUE_HOLD", "REQUEUED",
+                      "RESIZING", "REVOKED", "SIGNALING", "SPECIAL_EXIT", "STAGE_OUT", "STOPPED", "SUSPENDED")
+
     @staticmethod
     def get_cluster_resources():
         process = subprocess.Popen(shlex.split('sinfo -N --format="%N;%a;%b;%c;%z;%O;%m;%e"'),
@@ -158,7 +120,7 @@ class Slurm(object):
     @staticmethod
     def get_job_status():
         process = subprocess.Popen(shlex.split('squeue --name=' + runtime_info.job_uuid + \
-                                               ' --format="%j;%A;%j;%D;%C;%m;%l;%N;%o;%T;%r"'),
+                                               ' --format="%j;%A;%D;%C;%m;%l;%N;%o;%T;%r"'),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, err = process.communicate()
         return_code = process.returncode
@@ -182,3 +144,78 @@ class Slurm(object):
                                 job_submission[row[0]][output[0][i]].append(row[i])
 
             return job_submission
+
+    @staticmethod
+    def get_job_states(job_status):
+        return job_status['STATE']
+
+    @staticmethod
+    def create_script(destination_cluster, resources, commands):
+        # TODO handle if resources are empty
+        # Based on the existing tool at http://www.ceci-hpc.be/scriptgen.html
+        script = "#!/bin/bash\n"
+        # Job Name == Job UUID
+        script += "#SBATCH --job-name=" + runtime_info.job_uuid + "\n"
+
+        # Job duration
+        timestamp = parse_duration(resources['duration'])
+        if 'duration' in resources:
+            script += "#SBATCH --time=" + timestamp + "\n"
+
+        # Embarrassingly parallel jobs
+        if 'nbr_jobs_in_array' in resources:
+            script += "#SBATCH --array=1-" + str(resources['nbr_jobs_in_array']) + "\n"
+
+        # Shared Memory / OpenMP jobs
+        if 'nbr_threads_per_process' in resources:
+            script += "#SBATCH --cpus-per-task=" + str(resources['nbr_threads_per_process']) + "\n"
+
+        # Message passing / MPI jobs
+        if 'nbr_processes' in resources:
+            script += "#SBATCH --ntasks=" + str(resources['nbr_processes']) + "\n"
+            if 'distribution' in resources:
+                if resources['distribution'] == 'grouped':
+                    script += "#SBATCH --nodes=1\n"
+                elif resources['distribution'] == 'scattered':
+                    script += "#SBATCH --ntasks-per-node=1\n"
+                elif resources['distribution'] == 'distributed' and 'nbr_of_nodes' in resources:
+                    script += "#SBATCH --ntasks-per-node=1\n"
+                    script += "#SBATCH --nodes=" + str(resources['nbr_of_nodes']) + "\n"
+        else:
+            script += "#SBATCH --ntasks=1\n"
+
+        # Memory
+        memory = parse_mem(resources['memory_per_thread'])
+        if 'memory_per_thread' in resources:
+            script += "#SBATCH --mem-per-cpu=" + str(memory) + "\n"
+
+        # Cluster specific values
+        if 'partition' in destination_cluster:
+            script += "#SBATCH --partition=" + destination_cluster['partition'] + "\n"
+            
+        script += "\n"
+
+        # Final values
+        if 'nbr_threads_per_process' in resources:
+            script += "export OMP_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n" \
+                     + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
+        if 'nbr_jobs_in_array' in resources:
+            script += "echo 'Task ID: $SLURM_ARRAY_TASK_ID'\n"
+
+        script += "\n"
+
+        # Commands
+        if len(commands) > 0:
+            if isinstance(commands, str):
+                if "srun" in commands:
+                    script += commands + "\n"
+                else:
+                    script += "srun " + commands + "\n"
+            elif isinstance(commands, list):
+                for command in commands:
+                    if "srun" in command:
+                        script += command + "\n"
+                    else:
+                        script += "srun " + command + "\n"
+
+        return script

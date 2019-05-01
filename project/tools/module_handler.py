@@ -75,7 +75,7 @@ class ModuleHandler:
             execution_cmd = module['execution'] + " '" + json.dumps(input) + "'"
             output = self.__exec_cmd__(execution_cmd, stage, module)
 
-            # TODO parse the command output to add to the user_input
+            # parse the command output to add to the user_input
             try:
                 self.__modules__[stage][i]['module_output'] = json.loads(output)
             except KeyError:
@@ -88,8 +88,6 @@ class ModuleHandler:
         return out
 
     def prep_remote(self):
-        # TODO to do lel
-
         # dat list comprehension tho
         remote_stages = ['preprocessing', 'postprocessing']
         remote_modules = [self.__modules__[stage][i + 1]['module']

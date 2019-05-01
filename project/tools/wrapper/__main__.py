@@ -29,19 +29,22 @@ def main(argv):
             handler.from_dict(runtime_info.modules)
 
             # Preprocessing modules execution
-            preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
-            runtime_info.__update_input__(preprocessing_output['input'])
-            runtime_info.__update_modules__(preprocessing_output['modules'])
+            if runtime_info.modules is not None:
+                preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
+                runtime_info.__update_input__(preprocessing_output['input'])
+                runtime_info.__update_modules__(preprocessing_output['modules'])
 
             # Job Execution
             execution.run()
-            # TODO wait for slurm to finish running the job
-            execution.wait()
+            # Wait for slurm to finish running the job
+            terminated_successfully = execution.wait()
 
-            # Postprocessing modules execution
-            postprocessing_output = handler.run('postprocessing', runtime_info.user_input)
-            runtime_info.__update_input__(postprocessing_output['input'])
-            runtime_info.__update_modules__(postprocessing_output['modules'])
+            if terminated_successfully and runtime_info.modules is not None:
+            #if True and runtime_info.modules is not None:
+                # Postprocessing modules execution
+                postprocessing_output = handler.run('postprocessing', runtime_info.user_input)
+                runtime_info.__update_input__(postprocessing_output['input'])
+                runtime_info.__update_modules__(postprocessing_output['modules'])
 
             # Cleanup of local files
             #cleanup.run()

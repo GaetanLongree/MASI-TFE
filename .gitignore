@@ -104,3 +104,4 @@ venv.bak/
 .mypy_cache/
 .idea/
 project/db.json
+project/data/user_input.yml

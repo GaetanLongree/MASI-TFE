@@ -1,7 +1,9 @@
+import getopt
 import os
+import sys
 
 from project import app
-import sys, getopt
+
 
 def cmd_helper():
     return """Usage: 
@@ -17,6 +19,7 @@ def cmd_helper():
         --retrieve <job UUID>
     """
 
+
 def main(argv):
     try:
         opts, args = getopt.getopt(argv, "hu:m:r:", ["user=", "module=", "retrieve="])
@@ -25,14 +28,12 @@ def main(argv):
         sys.exit(2)
 
     user_file = None
-    #user_file = "E:\\git\\MASI-TFE\\project\\data\\user_input.yml"
     module_file = None
     job_uuid = None
-    #job_uuid = "787eb2fd-d6ba-4377-81d1-3628ef6d72f6"
 
     for opt, arg in opts:
         if opt == '-h':
-            #print(cmd_helper())
+            print(cmd_helper())
             sys.exit()
         if opt in ("-u", "--user"):
             user_file = os.path.normpath(arg)
@@ -42,19 +43,17 @@ def main(argv):
             job_uuid = str(arg)
 
     if user_file is not None:
-        print("User input file: {}".format(user_file))
         if module_file is not None:
-            print("Modules input file: {}".format(module_file))
-            # TODO Launch staging w/ user input and staging module sequence
+            # Launch staging w/ user input and staging module sequence
             app.run_with_module(user_file, module_file)
         else:
-            # TODO Launch staging on User Input only
+            # Launch staging on User Input only
             app.run(user_file)
     elif job_uuid is not None:
         app.retrieve(job_uuid)
     else:
         print(cmd_helper())
 
+
 if __name__ == '__main__':
-    #app.run()
     main(sys.argv[1:])

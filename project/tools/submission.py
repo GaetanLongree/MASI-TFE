@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tarfile
 import uuid
 from project import package_directory, current_directory
@@ -49,18 +50,23 @@ class Submission:
         # Done so that new targets don't add additional preferred jobs
         self.original_target_preferred_jobs = self.destination_cluster['preferred_jobs']
 
+        # self.connection = Ssh(
+        #     self.destination_cluster['hostname'],
+        #     self.input['username'],
+        #     self.input['password'])
         self.connection = Ssh(
             self.destination_cluster['hostname'],
-            self.input['username'],
-            self.input['password'])
-        # TODO If not reachable, check the original target cluster preferred jobs and offer to user clusters with similar jobs
+            self.destination_cluster['port'],
+            self.input['private_key'],
+            self.input['passphrase'])
+        # If not reachable, check the original target cluster preferred jobs
+        # and offer to user clusters with similar jobs
         while not self.connection.__connect__():
             print("Unable to connect to cluster {} ({}), the cluster is unreachable".format(
                 self.destination_cluster['name'], self.destination_cluster['hostname']))
             print("Searching for available clusters...")
 
-            # TODO search cluster with similar preferred jobs
-
+            # search cluster with similar preferred jobs
             alt_clusters = []
             for job in self.original_target_preferred_jobs:
                 alt_clusters += inventory.get_cluster_similar_jobs(job)
@@ -84,19 +90,24 @@ class Submission:
                 self.destination_cluster = alt_clusters[int(choice) - 1]
                 self.input['destination_cluster'] = self.destination_cluster['name']
 
+            # self.connection = Ssh(
+            #     self.destination_cluster['hostname'],
+            #     self.input['username'],
+            #     self.input['password'])
             self.connection = Ssh(
                 self.destination_cluster['hostname'],
-                self.input['username'],
-                self.input['password'])
+                self.destination_cluster['port'],
+                self.input['private_key'],
+                self.input['passphrase'])
 
         self.connection.__prep_remote_env__(self.job_uuid)
 
     def __run__(self):
 
-        # TODO check if job is a local file or a directory
+        # check if job is a local file or a directory
         if not self.ONLINE_JOB_FILE:
             if os.path.isdir(self.input['job']):
-                # TODO TAR the dir
+                # TAR the dir
                 self.TAR_FILE = True
                 with tarfile.open(os.path.join(current_directory, self.input['job']+".tar.gz"), "w:gz") as tar:
                     tar.add(os.path.join(current_directory, self.input['job']),
@@ -108,13 +119,14 @@ class Submission:
                 self.connection.__transfer__(self.input['job'], current_directory)
 
         self.__prep_data__()
-        # TODO save data in DB
+        # save data in DB
         submissions.save_user_data(self.job_uuid, self.aggregated_data)
 
-        # TODO write USER DATA to file for sending then delete file
+        # write USER DATA to file for sending then delete file
         with open(os.path.join(package_directory, 'input.json'), 'w') as file:
             # json.dump(self.user_input, file)
             file.write(json.dumps(self.aggregated_data))
+            file.close()
 
         self.connection.__transfer__('input.json', os.path.join(package_directory,''))
         self.connection.__transfer_wrapper__()
@@ -136,18 +148,45 @@ class Submission:
         self.aggregated_data['tar_file'] = self.TAR_FILE
 
     def __close__(self):
-        # TODO Cleanup files
+        # Cleanup files
         os.remove(os.path.join(package_directory, 'input.json'))
         os.remove(os.path.join(package_directory, 'wrapper.tar.gz'))
         self.connection.__close__()
 
     @staticmethod
     def retrieve_result(job_uuid):
+        # manage results in an array
         submission = submissions.get(job_uuid)
-        output_filename = submission['user_input']['output']
+        # connection = Ssh(
+        #     submission['user_input']['destination_cluster']['hostname'],
+        #     submission['user_input']['input']['username'],
+        #     submission['user_input']['input']['password'])
         connection = Ssh(
             submission['user_input']['destination_cluster']['hostname'],
-            submission['user_input']['username'],
-            submission['user_input']['password'])
+            submission['user_input']['destination_cluster']['port'],
+            submission['user_input']['input']['private_key'],
+            submission['user_input']['input']['passphrase'])
         connection.__connect__()
-        connection.__retrieve__(output_filename, job_uuid)
+
+        # TODO use data received from Wrapper with the job directory
+        # Workaround until API is up and running
+        working_dir = ""
+        if submission['user_input']['online_job_file'] or submission['user_input']['tar_file']:
+            if re.search(r"\.git$", submission['user_input']['input']['job']):
+                regex = r"\/([^\/]+)\/?(?=\.git$)"
+                folder_name = (re.search(regex, submission['user_input']['input']['job'])).group(1)
+                working_dir = job_uuid + '/' + folder_name + '/'
+            else:
+                working_dir = job_uuid + '/' + submission['user_input']['input']['job'] + '/'
+        else:
+            working_dir = job_uuid + '/'
+
+        if len(submission['user_input']['input']['output']) > 0:
+            if isinstance(submission['user_input']['input']['output'], str):
+                # do single command compilation
+                connection.__retrieve__(job_uuid, submission['user_input']['input']['output'],
+                                        working_dir + submission['user_input']['input']['output'])
+            elif isinstance(submission['user_input']['input']['output'], list):
+                for output in submission['user_input']['input']['output']:
+                    # do list command compilation
+                    connection.__retrieve__(job_uuid, output, working_dir + output)

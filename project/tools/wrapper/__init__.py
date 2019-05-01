@@ -10,7 +10,9 @@ class RuntimeInfo:
         self.destination_cluster = None
         self.modules = None
         self.facts = None
-        self.working_directory = os.path.join(os.getcwd(),'')
+        self.job_directory = os.path.join(os.getcwd(),'')
+        self.working_directory = os.path.join(os.getcwd(), '')
+        self.job_status = None
 
     def update(self, input_values):
         self.job_uuid = input_values['job_uuid']
@@ -29,6 +31,12 @@ class RuntimeInfo:
     def __update_facts__(self, values):
         self.facts = values
 
+    def __update_job_status__(self, values):
+        self.job_status = values
+
+    def __update_working_dir__(self, path):
+        self.working_directory = path
+
     def get_all(self):
         aggregated = dict()
         aggregated['job_uuid'] = self.job_uuid
@@ -38,7 +46,9 @@ class RuntimeInfo:
         aggregated['destination_cluster'] = self.destination_cluster
         aggregated['modules'] = self.modules
         aggregated['facts'] = self.facts
+        aggregated['job_directory'] = self.job_directory
         aggregated['working_directory'] = self.working_directory
+        aggregated['job_status'] = self.job_status
         return aggregated
 
 
