@@ -8,7 +8,8 @@ def notify_client(param):
 
 
 def update_job_status():
-    debug.log(json.dumps(runtime_info.job_status, indent=4))
+    #debug.log(json.dumps(runtime_info.job_status, indent=4))
+    pass
 
 
 def update_job_id(job_id):

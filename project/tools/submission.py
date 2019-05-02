@@ -21,7 +21,7 @@ class Submission:
         self.modules = None
         self.aggregated_data = dict()
 
-    def __import_user_input__(self, user_input_file):
+    def import_user_input(self, user_input_file):
         user_input = Parser.yaml(user_input_file)
         if self.__validate_input__(user_input):
             self.input = user_input
@@ -46,7 +46,7 @@ class Submission:
     def import_modules(self, modules):
         self.modules = modules
 
-    def __connect__(self):
+    def connect(self):
         # Done so that new targets don't add additional preferred jobs
         self.original_target_preferred_jobs = self.destination_cluster['preferred_jobs']
 
@@ -57,6 +57,7 @@ class Submission:
         self.connection = Ssh(
             self.destination_cluster['hostname'],
             self.destination_cluster['port'],
+            self.input['username'],
             self.input['private_key'],
             self.input['passphrase'])
         # If not reachable, check the original target cluster preferred jobs
@@ -97,12 +98,13 @@ class Submission:
             self.connection = Ssh(
                 self.destination_cluster['hostname'],
                 self.destination_cluster['port'],
+                self.input['username'],
                 self.input['private_key'],
                 self.input['passphrase'])
 
         self.connection.__prep_remote_env__(self.job_uuid)
 
-    def __run__(self):
+    def run(self):
 
         # check if job is a local file or a directory
         if not self.ONLINE_JOB_FILE:
@@ -118,9 +120,11 @@ class Submission:
                 self.TAR_FILE = False
                 self.connection.__transfer__(self.input['job'], current_directory)
 
-        self.__prep_data__()
         # save data in DB
         submissions.save_user_data(self.job_uuid, self.aggregated_data)
+        # delete sensitive data before sending to cluster
+        del self.aggregated_data['input']['private_key']
+        del self.aggregated_data['input']['passphrase']
 
         # write USER DATA to file for sending then delete file
         with open(os.path.join(package_directory, 'input.json'), 'w') as file:
@@ -139,7 +143,7 @@ class Submission:
         # TODO perform some kind of validation
         return True
 
-    def __prep_data__(self):
+    def prep_aggregated_data(self):
         self.aggregated_data['job_uuid'] = str(self.job_uuid)
         self.aggregated_data['input'] = self.input
         self.aggregated_data['destination_cluster'] = self.destination_cluster
@@ -147,7 +151,7 @@ class Submission:
         self.aggregated_data['online_job_file'] = self.ONLINE_JOB_FILE
         self.aggregated_data['tar_file'] = self.TAR_FILE
 
-    def __close__(self):
+    def close(self):
         # Cleanup files
         os.remove(os.path.join(package_directory, 'input.json'))
         os.remove(os.path.join(package_directory, 'wrapper.tar.gz'))
@@ -164,6 +168,7 @@ class Submission:
         connection = Ssh(
             submission['user_input']['destination_cluster']['hostname'],
             submission['user_input']['destination_cluster']['port'],
+            submission['user_input']['input']['username'],
             submission['user_input']['input']['private_key'],
             submission['user_input']['input']['passphrase'])
         connection.__connect__()
@@ -190,3 +195,7 @@ class Submission:
                 for output in submission['user_input']['input']['output']:
                     # do list command compilation
                     connection.__retrieve__(job_uuid, output, working_dir + output)
+
+    def validate_agreggate_data(self):
+        # TODO verify that user input contains all the needed information (prompt user to correct and continue?)
+        return True

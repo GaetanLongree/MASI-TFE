@@ -8,7 +8,7 @@ requirements:
 job: https://github.com/GaetanLongree/test.git
 #compilation:
 execution:
-  - "./job"
+  - "srun ./job"
 output:
   - "result.txt"
 resources:

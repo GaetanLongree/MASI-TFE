@@ -23,7 +23,7 @@ def __gather_facts__():
     os['version'] = platform.version()
 
     facts['os'] = os
-    workload_manager.get(runtime_info.destination_cluster['workload_manager']).get_cluster_resources()
+    facts['cluster'] = workload_manager.get(runtime_info.destination_cluster['workload_manager']).get_cluster_resources()
     runtime_info.__update_facts__(facts)
     # TODO POST to API
 

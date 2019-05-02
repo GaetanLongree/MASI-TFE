@@ -7,6 +7,7 @@ import numpy
 from . import runtime_info, debug
 import re
 
+
 def get(workload_manager):
     if workload_manager == 'slurm':
         return Slurm
@@ -59,9 +60,9 @@ def parse_mem(param):
 class Slurm(object):
     TERMINATED_STATUSES = ("BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL",
                            "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT")
-    TERMINATED_SUCCESSFULLY_STATUSES = ("COMPLETED", )
+    TERMINATED_SUCCESSFULLY_STATUSES = ("COMPLETED",)
     WAITING_STATUSES = ("PENDING", "CONFIGURING")
-    RUNNING_STATUSES = ("RUNNING", )
+    RUNNING_STATUSES = ("RUNNING",)
     EVENT_STATUSES = ("COMPLETING", "RESV_DEL_HOLD", "REQUEUE_FED", "REQUEUE_HOLD", "REQUEUED",
                       "RESIZING", "REVOKED", "SIGNALING", "SPECIAL_EXIT", "STAGE_OUT", "STOPPED", "SUSPENDED")
 
@@ -80,7 +81,7 @@ class Slurm(object):
                 output[i] = row.split(';')
 
             for i in range(1, len(output[0])):
-                for row in output[1:]:
+                for row in output[1:-1]:
                     try:
                         nodes[row[0]][output[0][i]] = row[i]
                     except KeyError:
@@ -119,8 +120,13 @@ class Slurm(object):
 
     @staticmethod
     def get_job_status():
-        process = subprocess.Popen(shlex.split('squeue --name=' + runtime_info.job_uuid + \
-                                               ' --format="%j;%A;%D;%C;%m;%l;%N;%o;%T;%r"'),
+        # process = subprocess.Popen(shlex.split('squeue --name=' + runtime_info.job_uuid + \
+        #                                        ' --format="%j;%A;%D;%C;%m;%l;%N;%o;%T;%r"'),
+        #                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        process = subprocess.Popen(shlex.split('sacct --name=' + runtime_info.job_uuid + \
+                                               ' --format=JobName,JobID,NNodes,NodeList,AllocTRES,ReqTRES,CPUTime,'
+                                               'Elapsed,NCPUS,WorkDir,State,ExitCode --parsable2'),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, err = process.communicate()
         return_code = process.returncode
@@ -129,10 +135,10 @@ class Slurm(object):
             output = output.split('\n')
             job_submission = dict()
             for row, i in zip(output, range(0, len(output))):
-                output[i] = row.split(';')
+                output[i] = row.split('|')
 
             for i in range(1, len(output[0])):
-                for row in output[1:]:
+                for row in output[1:-1]:
                     if row[0] is not "":
                         try:
                             job_submission[row[0]][output[0][i]].append(row[i])
@@ -147,7 +153,10 @@ class Slurm(object):
 
     @staticmethod
     def get_job_states(job_status):
-        return job_status['STATE']
+        try:
+            return job_status[runtime_info.job_uuid]['State']
+        except KeyError:
+            return {}  # TODO if empty --> get info from sacct
 
     @staticmethod
     def create_script(destination_cluster, resources, commands):
@@ -192,13 +201,13 @@ class Slurm(object):
         # Cluster specific values
         if 'partition' in destination_cluster:
             script += "#SBATCH --partition=" + destination_cluster['partition'] + "\n"
-            
+
         script += "\n"
 
         # Final values
         if 'nbr_threads_per_process' in resources:
             script += "export OMP_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n" \
-                     + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
+                      + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
         if 'nbr_jobs_in_array' in resources:
             script += "echo 'Task ID: $SLURM_ARRAY_TASK_ID'\n"
 
@@ -207,15 +216,9 @@ class Slurm(object):
         # Commands
         if len(commands) > 0:
             if isinstance(commands, str):
-                if "srun" in commands:
-                    script += commands + "\n"
-                else:
-                    script += "srun " + commands + "\n"
+                script += commands + "\n"
             elif isinstance(commands, list):
                 for command in commands:
-                    if "srun" in command:
-                        script += command + "\n"
-                    else:
-                        script += "srun " + command + "\n"
+                    script += command + "\n"
 
         return script

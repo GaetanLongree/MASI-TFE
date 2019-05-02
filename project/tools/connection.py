@@ -32,11 +32,12 @@ class Ssh:
     #     self.password = password
     #     self.client = client.SSHClient()
 
-    def __init__(self, address, port, pkey_file, passphrase):
+    def __init__(self, address, port, username, pkey_file, passphrase):
         self.address = address
         self.port = port
+        self.username = username
         self.pkey_file = RSAKey.from_private_key_file(pkey_file, passphrase)
-        self.passphrase = passphrase
+        self.passphrase = passphrase    # TODO clear the passphrase pkeyfile location for security
         self.client = client.SSHClient()
 
     def __connect__(self):
@@ -55,6 +56,7 @@ class Ssh:
             self.client.connect(
                 hostname=self.address,
                 port=self.port,
+                username=self.username,
                 pkey=self.pkey_file,
                 passphrase=self.passphrase,
                 look_for_keys=False

@@ -87,23 +87,25 @@ class ModuleHandler:
         out['modules'] = self.__modules__
         return out
 
-    def prep_remote(self):
-        # dat list comprehension tho
-        remote_stages = ['preprocessing', 'postprocessing']
-        remote_modules = [self.__modules__[stage][i + 1]['module']
-                          for stage in remote_stages
-                          for i in range(0, len(self.__modules__[stage]))]
+    def prep_remote(self, modules=True):
+        if modules:
+            # dat list comprehension tho
+            remote_stages = ['preprocessing', 'postprocessing']
+            remote_modules = [self.__modules__[stage][i + 1]['module']
+                              for stage in remote_stages
+                              for i in range(0, len(self.__modules__[stage]))]
 
-        remote_modules = numpy.unique(remote_modules)
+            remote_modules = numpy.unique(remote_modules)
 
-        # create modules folder in wrapper
-        if os.path.isdir(os.path.join(WRAPPER_PATH, 'modules')):
-            shutil.rmtree(os.path.join(WRAPPER_PATH, 'modules'))
-        os.mkdir(os.path.join(WRAPPER_PATH, 'modules'))
-        # copy required modules to new folder
-        for module in remote_modules:
-            copyfile(os.path.join(package_directory, 'modules', module),
-                     os.path.join(WRAPPER_PATH, 'modules', module))
+            # create modules folder in wrapper
+            if os.path.isdir(os.path.join(WRAPPER_PATH, 'modules')):
+                shutil.rmtree(os.path.join(WRAPPER_PATH, 'modules'))
+            os.mkdir(os.path.join(WRAPPER_PATH, 'modules'))
+            # copy required modules to new folder
+            for module in remote_modules:
+                copyfile(os.path.join(package_directory, 'modules', module),
+                         os.path.join(WRAPPER_PATH, 'modules', module))
+
         # copy this file to the wrapper folder
         copyfile(__file__, os.path.join(WRAPPER_PATH, os.path.basename(__file__)))
         # Copy other user files
