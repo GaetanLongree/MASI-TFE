@@ -1,3 +1,4 @@
+import getpass
 import json
 import os
 import re
@@ -11,6 +12,12 @@ from project.tools.parser import Parser
 
 
 class Submission:
+    REQUIRED = ('username', 'private_key', 'user_mail', 'destination_cluster', 'job', 'execution', 'output')
+    OPTIONAL = ('passphrase', 'requirements', 'resources', 'kwargs')
+    AGGREGATED_REQUIRED = ('username', 'private_key', 'user_mail', 'destination_cluster', 'job', 'execution', 'output',
+                           'resources')
+    AGGREGATED_OPTIONAL = ('passphrase', 'resources', 'kwargs')
+
     def __init__(self):
         self.connection = None
         self.job_uuid = uuid.uuid4()
@@ -48,18 +55,19 @@ class Submission:
 
     def connect(self):
         # Done so that new targets don't add additional preferred jobs
-        self.original_target_preferred_jobs = self.destination_cluster['preferred_jobs']
+        original_target_preferred_jobs = self.destination_cluster['preferred_jobs']
 
-        # self.connection = Ssh(
-        #     self.destination_cluster['hostname'],
-        #     self.input['username'],
-        #     self.input['password'])
+        if 'passphrase' not in self.input:
+            passphrase = getpass.getpass(prompt="Please enter the passphrase to your private key file: ")
+        else:
+            passphrase = self.input['passphrase']
+
         self.connection = Ssh(
             self.destination_cluster['hostname'],
             self.destination_cluster['port'],
             self.input['username'],
             self.input['private_key'],
-            self.input['passphrase'])
+            passphrase)
         # If not reachable, check the original target cluster preferred jobs
         # and offer to user clusters with similar jobs
         while not self.connection.__connect__():
@@ -69,7 +77,7 @@ class Submission:
 
             # search cluster with similar preferred jobs
             alt_clusters = []
-            for job in self.original_target_preferred_jobs:
+            for job in original_target_preferred_jobs:
                 alt_clusters += inventory.get_cluster_similar_jobs(job)
 
             # TODO check if alternative are reachable instead of based on current target name
@@ -91,16 +99,12 @@ class Submission:
                 self.destination_cluster = alt_clusters[int(choice) - 1]
                 self.input['destination_cluster'] = self.destination_cluster['name']
 
-            # self.connection = Ssh(
-            #     self.destination_cluster['hostname'],
-            #     self.input['username'],
-            #     self.input['password'])
             self.connection = Ssh(
                 self.destination_cluster['hostname'],
                 self.destination_cluster['port'],
                 self.input['username'],
                 self.input['private_key'],
-                self.input['passphrase'])
+                passphrase)
 
         self.connection.__prep_remote_env__(self.job_uuid)
 
@@ -111,11 +115,11 @@ class Submission:
             if os.path.isdir(self.input['job']):
                 # TAR the dir
                 self.TAR_FILE = True
-                with tarfile.open(os.path.join(current_directory, self.input['job']+".tar.gz"), "w:gz") as tar:
+                with tarfile.open(os.path.join(current_directory, self.input['job'] + ".tar.gz"), "w:gz") as tar:
                     tar.add(os.path.join(current_directory, self.input['job']),
                             os.path.basename(os.path.join(current_directory, self.input['job'])))
                     tar.close()
-                    self.connection.__transfer__(self.input['job']+".tar.gz", current_directory)
+                    self.connection.__transfer__(self.input['job'] + ".tar.gz", current_directory)
             else:
                 self.TAR_FILE = False
                 self.connection.__transfer__(self.input['job'], current_directory)
@@ -124,7 +128,8 @@ class Submission:
         submissions.save_user_data(self.job_uuid, self.aggregated_data)
         # delete sensitive data before sending to cluster
         del self.aggregated_data['input']['private_key']
-        del self.aggregated_data['input']['passphrase']
+        if 'passphrase' in self.input:
+            del self.aggregated_data['input']['passphrase']
 
         # write USER DATA to file for sending then delete file
         with open(os.path.join(package_directory, 'input.json'), 'w') as file:
@@ -132,15 +137,37 @@ class Submission:
             file.write(json.dumps(self.aggregated_data))
             file.close()
 
-        self.connection.__transfer__('input.json', os.path.join(package_directory,''))
+        self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
         self.connection.__transfer_wrapper__()
         self.connection.run_command('tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
         # pip install must be run in foreground to install dependencies
-        self.connection.run_command_foreground('pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
+        self.connection.run_command_foreground(
+            'pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
         self.connection.run_command('cd ' + str(self.job_uuid) + ' \n python -m wrapper -i input.json')
 
-    def __validate_input__(self, user_input):
+    def __validate_input__(self, user_input, required=REQUIRED, optional=OPTIONAL, stage="user input file import"):
         # TODO perform some kind of validation
+
+        if not all(elem in user_input for elem in required):
+            print("ERROR during {}: elements are missing from user input - minimum required: {}"
+                  .format(stage, required))
+            return False
+
+        if not all(elem in user_input for elem in optional):
+            print("Some optional elements appear to be missing during the {} (optional entries: {} )"
+                  .format(stage, optional))
+            print("If you are using modules to determine these input, "
+                  "be sure to pass and verify the modules as argument as well.")
+            str_in = ""
+            while str_in not in ('y', 'yes', 'n', 'no'):
+                str_in = input("Are you sure you wish to continue without these entries? [Y|N] ")
+                str_in = str_in.lower()
+
+            if str_in in ('y', 'yes'):
+                return True
+            else:
+                return False
+
         return True
 
     def prep_aggregated_data(self):
@@ -196,6 +223,17 @@ class Submission:
                     # do list command compilation
                     connection.__retrieve__(job_uuid, output, working_dir + output)
 
-    def validate_agreggate_data(self):
+    def validate_aggregated_data(self):
         # TODO verify that user input contains all the needed information (prompt user to correct and continue?)
-        return True
+        if self.__validate_input__(self.aggregated_data['input'],
+                                   required=self.AGGREGATED_REQUIRED,
+                                   optional=self.AGGREGATED_OPTIONAL,
+                                   stage="aggregated data verification"):
+            return True
+        else:
+            str_in = ""
+            while str_in not in ('y', 'yes'):
+                str_in = input("Please verify your user input and/or your modules file, then enter Y to retry: ")
+                str_in = str_in.lower()
+
+            return False

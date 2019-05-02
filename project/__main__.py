@@ -41,7 +41,7 @@ def main(argv):
             module_file = os.path.normpath(arg)
         if opt in ("-r", "--retrieve"):
             job_uuid = str(arg)
-
+    # TODO global error management
     if user_file is not None:
         if module_file is not None:
             # Launch staging w/ user input and staging module sequence

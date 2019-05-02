@@ -22,7 +22,7 @@ def run_with_module(user_file, module_file):
         # Prepare for pre- and post- modules execution on cluster
         handler.prep_remote()
         submission.prep_aggregated_data()
-        validated = submission.validate_agreggate_data()
+        validated = submission.validate_aggregated_data()
 
     if validated:
         submission.connect()
@@ -43,7 +43,7 @@ def run(user_file):
         # Prepare for pre- and post- modules execution on cluster
         handler.prep_remote(modules=False)
         submission.prep_aggregated_data()
-        validated = submission.validate_agreggate_data()
+        validated = submission.validate_aggregated_data()
 
     if validated:
         submission.connect()
