@@ -1,0 +1,28 @@
+use admin
+db.createUser(
+    {
+        user: "root",
+        pwd: "root",
+        roles:["root"],
+	mechanisms:[  
+		"SCRAM-SHA-1"
+	]
+    }
+);
+
+use masi_tfe
+db.createUser(
+    {
+        user: "user",
+        pwd: "password",
+        roles:[
+            {
+                role: "readWrite",
+                db: "masi_tfe"
+            }
+        ],
+	mechanisms:[  
+		"SCRAM-SHA-1"
+	]
+    }
+);

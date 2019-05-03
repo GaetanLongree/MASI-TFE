@@ -1,0 +1,31 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CECI Clusters Dashboard</title>
+</head>
+<body>
+    <table border = 1>
+        <tr>
+            <th> Name </th>
+            <th> Hostname </th>
+            <th> Port </th>
+            <th> Workload Manager </th>
+            <th> Preferred Jobs </th>
+            <th> Partition </th>
+        </tr>
+        {% for key, value in result.items() %}
+            <tr>
+                <th> {{ value["name"] }} </th>
+                <td> {{ value["hostname"] }} </td>
+                <td> {{ value["port"] }} </td>
+                <td> {{ value["workload_manager"] }} </td>
+                <td> <ul>{% for job in value["preferred_jobs"] %}
+                        <li> {{ job }} </li>
+                    {% endfor %}
+                </ul> </td>
+                <td> {{ value["partition"] }} </td>
+            </tr>
+        {% endfor %}
+      </table>
+</body>
+</html>
