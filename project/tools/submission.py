@@ -6,8 +6,9 @@ import tarfile
 import uuid
 from project import package_directory, current_directory
 from project.tools.connection import Ssh, is_reachable
-from project.tools.dao import submissions
-from project.tools.dao import inventory
+# from project.tools.dao import submissions
+# from project.tools.dao import inventory
+from project.tools import api_handler
 from project.tools.parser import Parser
 
 
@@ -36,7 +37,7 @@ class Submission:
             raise Exception("Error in the user input file.")
 
         # Find the target cluster from User desired input
-        self.destination_cluster = inventory.get_cluster(user_input['destination_cluster'])
+        self.destination_cluster = api_handler.get_cluster(user_input['destination_cluster'])
         if self.destination_cluster is None:
             raise Exception("Cluster {} not present in database.".format(user_input['destination_cluster']))
 
@@ -76,9 +77,7 @@ class Submission:
             print("Searching for available clusters...")
 
             # search cluster with similar preferred jobs
-            alt_clusters = []
-            for job in original_target_preferred_jobs:
-                alt_clusters += inventory.get_cluster_similar_jobs(job)
+            alt_clusters = api_handler.get_cluster_similar_jobs(original_target_preferred_jobs)
 
             # TODO check if alternative are reachable instead of based on current target name
             alt_clusters = [entry for entry in alt_clusters if is_reachable(entry['hostname'])]
@@ -86,7 +85,7 @@ class Submission:
             if len(alt_clusters) == 0:
                 print("No clusters with similar job preferences were found")
                 self.input['destination_cluster'] = input("Please enter the name of a new destination cluster: ")
-                self.destination_cluster = inventory.get_cluster(self.input['destination_cluster'])
+                self.destination_cluster = api_handler.get_cluster(self.input['destination_cluster'])
                 if self.destination_cluster is None:
                     raise Exception(
                         "Cluster {} not present in database.".format(self.input['destination_cluster']))
@@ -124,12 +123,13 @@ class Submission:
                 self.TAR_FILE = False
                 self.connection.__transfer__(self.input['job'], current_directory)
 
-        # save data in DB
-        submissions.save_user_data(self.job_uuid, self.aggregated_data)
         # delete sensitive data before sending to cluster
         del self.aggregated_data['input']['private_key']
         if 'passphrase' in self.input:
             del self.aggregated_data['input']['passphrase']
+
+        # save data in DB
+        api_handler.submit_job(self.job_uuid, self.aggregated_data)
 
         # write USER DATA to file for sending then delete file
         with open(os.path.join(package_directory, 'input.json'), 'w') as file:
@@ -172,7 +172,7 @@ class Submission:
 
     def prep_aggregated_data(self):
         self.aggregated_data['job_uuid'] = str(self.job_uuid)
-        self.aggregated_data['input'] = self.input
+        self.aggregated_data['user_input'] = self.input
         self.aggregated_data['destination_cluster'] = self.destination_cluster
         self.aggregated_data['modules'] = self.modules
         self.aggregated_data['online_job_file'] = self.ONLINE_JOB_FILE
@@ -187,7 +187,8 @@ class Submission:
     @staticmethod
     def retrieve_result(job_uuid):
         # manage results in an array
-        submission = submissions.get(job_uuid)
+        submission = api_handler.get_job(job_uuid)
+        # TODO verify that job as finished before attempting to retrieve
         # connection = Ssh(
         #     submission['user_input']['destination_cluster']['hostname'],
         #     submission['user_input']['input']['username'],
