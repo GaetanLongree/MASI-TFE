@@ -1,3 +1,4 @@
+import bson
 from flask import Flask, jsonify, render_template, request
 from api_srv.dao import db_handler
 
@@ -10,7 +11,6 @@ app = Flask(__name__)
 @app.route("/", methods=["GET"])
 def index():
     result = db_handler.get_clusters()
-    print(result)
     return render_template("clusters.html", result=result)
 
 
@@ -20,52 +20,70 @@ def get_all_clusters():
     return jsonify(result=result), 200
 
 
+@app.route("/jobs/<job_id>", methods=["GET"])
+def get_single_element(job_id: str = None):
+    try:
+        result = db_handler.get_entry(job_id)
+        if len(result) > 0:
+            return jsonify(result=result), 200
+        else:
+            return jsonify(error="No entry found with user_id {}".format(job_id)), 404
+    except bson.errors.InvalidId:
+        return jsonify(error="No entry found with user_id {}".format(job_id)), 404
+    except Exception as err:
+        return jsonify(error=err), 400
+    except:
+        return jsonify(error="Could not process request"), 500
+
+@app.route("/jobs/<job_id>/state", methods=["GET"])
+def get_element_state(job_id: str = None):
+    try:
+        result = db_handler.get_job_state(job_id)
+        if len(result) > 0:
+            return jsonify(result=result), 200
+        else:
+            return jsonify(error="No entry found with user_id {}".format(job_id)), 404
+    except bson.errors.InvalidId:
+        return jsonify(error="No entry found with user_id {}".format(job_id)), 404
+    except Exception as err:
+        return jsonify(error=err), 400
+    except:
+        return jsonify(error="Could not process request"), 500
+
+
 @app.route("/jobs/<job_id>", methods=["POST"])
-def insert_element():
+def insert_element(job_id: str = None):
     if request.headers['Content-Type'] == 'application/json':
         try:
-            new_entry = dict()
-            if "name" in request.get_json():
-                new_entry["name"] = request.get_json()["name"]
-            if "phone_number" in request.get_json():
-                new_entry["phone_number"] = request.get_json()["phone_number"]
-            if "email" in request.get_json():
-                new_entry["email"] = request.get_json()["email"]
-
-            result = db_handler.insert_new_entry(new_entry)
+            new_job = request.get_json()
+            result = db_handler.insert_new_job(new_job)
 
             if result is not "":
-                return jsonify(inserted_id=result), 200
+                return jsonify(job_uuid=result), 200
             else:
                 return request.get_json(), 500
         except ValueError as e:
             return jsonify(error=e.args), 500
 
+
 @app.route("/jobs/<job_id>", methods=["PUT"])
-def update_element(user_id: str = None):
+def update_element(job_id: str = None):
     if request.headers['Content-Type'] == 'application/json':
         try:
-            new_entry = dict()
-            if "name" in request.get_json():
-                new_entry["name"] = request.get_json()["name"]
-            if "phone_number" in request.get_json():
-                new_entry["phone_number"] = request.get_json()["phone_number"]
-            if "email" in request.get_json():
-                new_entry["email"] = request.get_json()["email"]
+            entry_update = request.get_json()
 
-            result = flask_mongo.update_entry(user_id, new_entry)
+            result = db_handler.update_job(job_id, entry_update)
 
             if result == 1:
                 return jsonify(success=True), 200
             else:
                 return request.get_json(), 500
         except bson.errors.InvalidId:
-            return jsonify(error="No entry found with user_id {}".format(user_id)), 404
+            return jsonify(error="No entry found with user_id {}".format(job_id)), 404
         except ValueError as e:
             return jsonify(error=e.args), 500
     else:
         return jsonify(error="Could not process request"), 500
-
 
 
 app.run(host=SERVER_IP, port=SERVER_PORT)
