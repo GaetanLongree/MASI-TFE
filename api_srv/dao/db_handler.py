@@ -25,19 +25,23 @@ def get_clusters():
     return result
 
 
-def get_entry(job_id):
+def get_job(job_id):
     table = get_table('jobs')
     if job_id is None:
         raise Exception("No ID given")
     else:
         result = table.find({"job_uuid": (job_id)})
-    return to_dict(result)
+        if result.count() < 1:
+            raise bson.errors.InvalidId()
+        return to_dict(result)
 
 
 def insert_new_job(new_job):
     table = get_table('jobs')
-
-    result = table.find({"job_uuid": new_job["job_uuid"]})
+    try:
+        result = table.find({"job_uuid": new_job["job_uuid"]})
+    except KeyError:
+        raise KeyError("No job UUID found in the payload.")
     if result.count() >= 1:
         raise ValueError("An entry with value 'job_uuid: {}' is already present. Duplicate "
                          "entries are not allowed".format(new_job["job_uuid"]))
@@ -75,3 +79,15 @@ def get_job_state(job_id):
         return result[job_id]['job_status']['State']
     else:
         return ['NOT_SUBMITTED']
+
+
+def update_cluster_status(cluster_hostname, cluster_status):
+    table = get_table('clusters')
+
+    # Check if the id exists
+    result = table.find({"hostname": cluster_hostname})
+    if result.count() < 1:
+        raise bson.errors.InvalidId("No entry found with user_id {}".format(cluster_hostname))
+
+    result = table.update_one({"hostname": cluster_hostname}, {"$set": {"status": cluster_status}})
+    return result.matched_count

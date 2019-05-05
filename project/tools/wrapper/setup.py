@@ -12,6 +12,7 @@ from . import runtime_info, debug, workload_manager, api_communicator
 def __import_input__(input_file):
     with open(input_file, 'r') as file:
         runtime_info.update(json.load(file))
+        file.close()
 
 
 def __gather_facts__():
@@ -24,6 +25,8 @@ def __gather_facts__():
 
     facts['os'] = os
     facts['cluster'] = workload_manager.get(runtime_info.destination_cluster['workload_manager']).get_cluster_resources()
+    runtime_info.__update_cluster_status__(facts['cluster'])
+    api_communicator.update_cluster_status()
     runtime_info.__update_facts__(facts)
     # TODO POST to API
 

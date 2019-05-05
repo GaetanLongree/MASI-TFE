@@ -50,7 +50,6 @@ def run(user_file):
         submission.run()
         submission.close()
         print('Your submission ID = {}'.format(submission.job_uuid))
-        print(json.dumps(get(submission.job_uuid)))
         exit(0)
 
 

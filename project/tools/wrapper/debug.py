@@ -12,6 +12,6 @@ def log(string):
     # tmp = open("/tmp/debug.log", "a+")
     # tmp.write(log)
     # tmp.close()
-    file = open(os.path.join(runtime_info.working_directory, "debug.log"), "a+")
+    file = open(os.path.join(runtime_info.job_directory, "debug.log"), "a+")
     file.write(log)
     file.close()

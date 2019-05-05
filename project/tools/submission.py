@@ -4,6 +4,9 @@ import os
 import re
 import tarfile
 import uuid
+
+import numpy
+
 from project import package_directory, current_directory
 from project.tools.connection import Ssh, is_reachable
 # from project.tools.dao import submissions
@@ -69,6 +72,9 @@ class Submission:
             self.input['username'],
             self.input['private_key'],
             passphrase)
+
+        # TODO use data from API to know if cluster is up or not
+
         # If not reachable, check the original target cluster preferred jobs
         # and offer to user clusters with similar jobs
         while not self.connection.__connect__():
@@ -124,9 +130,9 @@ class Submission:
                 self.connection.__transfer__(self.input['job'], current_directory)
 
         # delete sensitive data before sending to cluster
-        del self.aggregated_data['input']['private_key']
+        del self.aggregated_data['user_input']['private_key']
         if 'passphrase' in self.input:
-            del self.aggregated_data['input']['passphrase']
+            del self.aggregated_data['user_input']['passphrase']
 
         # save data in DB
         api_handler.submit_job(self.job_uuid, self.aggregated_data)
@@ -187,46 +193,55 @@ class Submission:
     @staticmethod
     def retrieve_result(job_uuid):
         # manage results in an array
-        submission = api_handler.get_job(job_uuid)
-        # TODO verify that job as finished before attempting to retrieve
-        # connection = Ssh(
-        #     submission['user_input']['destination_cluster']['hostname'],
-        #     submission['user_input']['input']['username'],
-        #     submission['user_input']['input']['password'])
-        connection = Ssh(
-            submission['user_input']['destination_cluster']['hostname'],
-            submission['user_input']['destination_cluster']['port'],
-            submission['user_input']['input']['username'],
-            submission['user_input']['input']['private_key'],
-            submission['user_input']['input']['passphrase'])
-        connection.__connect__()
+        job_state = api_handler.get_job_state(job_uuid)
+        job_state = numpy.unique(job_state)
 
-        # TODO use data received from Wrapper with the job directory
-        # Workaround until API is up and running
-        working_dir = ""
-        if submission['user_input']['online_job_file'] or submission['user_input']['tar_file']:
-            if re.search(r"\.git$", submission['user_input']['input']['job']):
-                regex = r"\/([^\/]+)\/?(?=\.git$)"
-                folder_name = (re.search(regex, submission['user_input']['input']['job'])).group(1)
-                working_dir = job_uuid + '/' + folder_name + '/'
+        if all(state == "COMPLETE" for state in job_state):
+            submission = api_handler.get_job(job_uuid)
+
+            if os.path.exists(submission['user_input']['private_key']):
+                pkey_path = submission['user_input']['private_key']
             else:
-                working_dir = job_uuid + '/' + submission['user_input']['input']['job'] + '/'
-        else:
-            working_dir = job_uuid + '/'
+                valid = False
+                path = submission['user_input']['private_key']
+                while not valid:
+                    string = input("Original private key file not found at the original given location ({})\n"
+                                   "Please enter the path to the private key file to connect to the cluster: "
+                                   .format(path))
+                    valid = os.path.exists(string)
+                    path = string
 
-        if len(submission['user_input']['input']['output']) > 0:
-            if isinstance(submission['user_input']['input']['output'], str):
-                # do single command compilation
-                connection.__retrieve__(job_uuid, submission['user_input']['input']['output'],
-                                        working_dir + submission['user_input']['input']['output'])
-            elif isinstance(submission['user_input']['input']['output'], list):
-                for output in submission['user_input']['input']['output']:
-                    # do list command compilation
-                    connection.__retrieve__(job_uuid, output, working_dir + output)
+                pkey_path = os.path.abspath(path)
+
+            passphrase = getpass.getpass(prompt="Please enter the passphrase to your private key file: ")
+
+            connection = Ssh(
+                submission['destination_cluster']['hostname'],
+                submission['destination_cluster']['port'],
+                submission['user_input']['username'],
+                pkey_path,
+                passphrase)
+            connection.__connect__()
+
+            # use data received from Wrapper with the job directory
+            working_dir = submission['working_directory']
+
+            if 'output' in submission['user_input'] and len(submission['user_input']['output']) > 0:
+                if isinstance(submission['user_input']['output'], str):
+                    # retrieve a single file
+                    connection.__retrieve__(job_uuid, submission['user_input']['output'],
+                                            working_dir + submission['user_input']['output'])
+                elif isinstance(submission['user_input']['output'], list):
+                    for output in submission['user_input']['output']:
+                        # do list command compilation
+                        connection.__retrieve__(job_uuid, output, working_dir + output)
+        else:
+            print("The job you're trying to retrieve has not completed yet\n"
+                  "Current state of job: {}".format(job_state))
 
     def validate_aggregated_data(self):
         # TODO verify that user input contains all the needed information (prompt user to correct and continue?)
-        if self.__validate_input__(self.aggregated_data['input'],
+        if self.__validate_input__(self.aggregated_data['user_input'],
                                    required=self.AGGREGATED_REQUIRED,
                                    optional=self.AGGREGATED_OPTIONAL,
                                    stage="aggregated data verification"):

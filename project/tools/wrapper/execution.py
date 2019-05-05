@@ -30,7 +30,7 @@ def run():
         if return_code == 0:
             # TODO manage for multiple JOB IDs being returned
             job_id = re.search(r"(?<=job )\b(\d*)", output).group(1)
-            api_communicator.update_job_id(job_id)
+            runtime_info.__update_working_dir__(os.getcwd())
         else:
             debug.log("ERROR: running slurm job - sbatch returned a non-zero return code" + \
                       "\nOutput: {}" + \
@@ -40,6 +40,12 @@ def run():
                             "\nError: {}".format(output, err))
 
 
+def __status_comparator__(statuses, values):
+    for status in statuses:
+        for value in values:
+            yield (status == value) or (value in status)
+
+
 def wait():
     # continuously get the job status and check for the job state (or states if in array)
     # NB: WLM = Workload Manager
@@ -47,33 +53,40 @@ def wait():
     job_status = wlm_handler.get_job_status()
     statuses = wlm_handler.get_job_states(job_status)
     unique_statuses = numpy.unique(statuses)
+    prev_statuses = []
 
     while (len(unique_statuses) == 1
-           and not any(status in wlm_handler.TERMINATED_STATUSES for status in unique_statuses)):
+           and not any(__status_comparator__(unique_statuses, wlm_handler.TERMINATED_STATUSES))):
         runtime_info.__update_job_status__(job_status)
 
-        # TODO do the API
-        api_communicator.update_job_status()
-        if any(status in wlm_handler.WAITING_STATUSES for status in unique_statuses):
-            api_communicator.notify_client("Job is currently in a waiting state (statuses : {})".format(statuses))
-        elif any(status in wlm_handler.RUNNING_STATUSES for status in unique_statuses):
-            api_communicator.notify_client("Job is currently in a running state (statuses : {})".format(statuses))
-        else:
-            api_communicator.notify_client(
-                "Job state has changed to {} (statuses : {})".format(unique_statuses, statuses))
+        debug.log("Job is currently in the state: {}".format(unique_statuses))
 
-        time.sleep(15)
+        unique_statuses.sort()
+        prev_statuses.sort()
 
+        if unique_statuses != prev_statuses:
+            api_communicator.update_job_status()
+            if any(status in wlm_handler.WAITING_STATUSES for status in unique_statuses):
+                api_communicator.notify_client(unique_statuses)
+            elif any(status in wlm_handler.RUNNING_STATUSES for status in unique_statuses):
+                api_communicator.notify_client(unique_statuses)
+            else:
+                api_communicator.notify_client(unique_statuses)
+
+        time.sleep(5)
+
+        prev_statuses = unique_statuses[:]
         job_status = wlm_handler.get_job_status()
         statuses = wlm_handler.get_job_states(job_status)
         unique_statuses = numpy.unique(statuses)
 
     # TODO once completed --> store output to safe storage location + send notification to API
     runtime_info.__update_job_status__(job_status)
+    api_communicator.update_job_status()
 
     if any(status in wlm_handler.TERMINATED_SUCCESSFULLY_STATUSES for status in unique_statuses):
-        api_communicator.notify_client("Job has successfully terminated its execution")
+        api_communicator.notify_client(unique_statuses)
         return True
     else:
-        api_communicator.notify_client("Job has terminated with the following status: {}".format(statuses))
+        api_communicator.notify_client(unique_statuses)
         return False

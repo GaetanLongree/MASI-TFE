@@ -1,11 +1,12 @@
 import requests
 import json
 
+#URI = "http://127.0.0.1:7676"
+URI = "https://www.longree.be/tfe/api"
+HEADER = {"Content-Type": "application/json"}
 
-URI = "http://127.0.0.1:7676"
 
-
-def get_clusters():
+def get_clusters(status=False):
     # get all clusters
     response = requests.get(URI + "/clusters")
     clusters = {}
@@ -13,6 +14,8 @@ def get_clusters():
         for key, value in json.loads(response.text)['result'].items():
             clusters[value['name']] = value
             clusters[value['name']]['port'] = int(clusters[value['name']]['port'])
+            if not status and 'status' in clusters[value['name']]:
+                del clusters[value['name']]['status']
     return clusters
 
 
@@ -31,10 +34,27 @@ def get_cluster_similar_jobs(jobs):
 
 
 def submit_job(job_uuid, job):
-    pass
+    response = requests.post(URI + "/jobs/" + str(job_uuid),
+                             data=json.dumps(job),
+                             headers=HEADER)
+    if response.status_code != 200:
+        raise Exception("Error while submitting job to the API.\nServer response ({}): {}"
+                        .format(response.status_code, response.text))
 
 
 def get_job(job_uuid):
-    return None
+    response = requests.get(URI + "/jobs/" + str(job_uuid))
+    if response.status_code == 200:
+        return json.loads(response.text)['result'][str(job_uuid)]
+    else:
+        raise Exception("Unable to retrieve job from server.\nError {} : {}"
+                        .format(response.status_code, response.text))
 
 
+def get_job_state(job_uuid):
+    response = requests.get(URI + "/jobs/" + str(job_uuid) + "/state")
+    if response.status_code == 200:
+        return json.loads(response.text)['result']
+    else:
+        raise Exception("Unable to retrieve job state from server.\nError {} : {}"
+                        .format(response.status_code, response.text))

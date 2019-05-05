@@ -4,6 +4,9 @@ import sys
 
 from project import app
 
+import warnings
+warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+
 
 def cmd_helper():
     return """Usage: 

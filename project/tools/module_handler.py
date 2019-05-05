@@ -10,12 +10,12 @@ try:
     from project import package_directory
 except ImportError:
     from . import runtime_info
-    package_directory = runtime_info.working_directory
+    package_directory = runtime_info.job_directory
 
 try:
     from project.constants import WRAPPER_PATH
 except ImportError:
-    WRAPPER_PATH = os.path.join(package_directory, 'tools', 'wrapper')
+    pass
 
 try:
     import project.tools.parser as parser
