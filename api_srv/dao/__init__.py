@@ -1,4 +1,3 @@
-# TODO connect to database here
 import configparser
 import os
 
