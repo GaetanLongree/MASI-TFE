@@ -5,7 +5,7 @@ import sys
 from project import app
 
 import warnings
-warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+warnings.filterwarnings(action='ignore', module='.*paramiko.*')
 
 
 def cmd_helper():
@@ -44,18 +44,21 @@ def main(argv):
             module_file = os.path.normpath(arg)
         if opt in ("-r", "--retrieve"):
             job_uuid = str(arg)
-    # TODO global error management
-    if user_file is not None:
-        if module_file is not None:
-            # Launch staging w/ user input and staging module sequence
-            app.run_with_module(user_file, module_file)
+
+    try:
+        if user_file is not None:
+            if module_file is not None:
+                # Launch staging w/ user input and staging module sequence
+                app.run_with_module(user_file, module_file)
+            else:
+                # Launch staging on User Input only
+                app.run(user_file)
+        elif job_uuid is not None:
+            app.retrieve(job_uuid)
         else:
-            # Launch staging on User Input only
-            app.run(user_file)
-    elif job_uuid is not None:
-        app.retrieve(job_uuid)
-    else:
-        print(cmd_helper())
+            print(cmd_helper())
+    except BaseException as err:
+        print(err)
 
 
 if __name__ == '__main__':

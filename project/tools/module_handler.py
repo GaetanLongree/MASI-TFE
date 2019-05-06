@@ -34,6 +34,7 @@ class ModuleHandler:
         self.__modules__ = modules
 
     def __exec_cmd__(self, command, stage, module):
+        # TODO check if the system has the binary to run the commands
         # change to the module directory (save the current one to return after)
         prev_dir = os.getcwd()
         try:
@@ -52,8 +53,8 @@ class ModuleHandler:
         os.chdir(prev_dir)
 
         if return_code is not 0:
-            raise Exception("Error during module execution in {} stage of the {} module:\n{}".format(
-                stage, module['module'], err))
+            raise Exception("Error during module execution in {} stage of the {} module:\n{}"
+                            .format(stage, module['module'], err))
         else:
             return output
 

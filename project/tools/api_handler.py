@@ -1,14 +1,15 @@
 import requests
 import json
+from requests.auth import HTTPBasicAuth
 
-#URI = "http://127.0.0.1:7676"
 URI = "https://www.longree.be/tfe/api"
 HEADER = {"Content-Type": "application/json"}
+AUTH = HTTPBasicAuth('username', 'password')
 
 
 def get_clusters(status=False):
     # get all clusters
-    response = requests.get(URI + "/clusters")
+    response = requests.get(URI + "/clusters", auth=AUTH)
     clusters = {}
     if response.status_code == 200:
         for key, value in json.loads(response.text)['result'].items():
@@ -36,14 +37,15 @@ def get_cluster_similar_jobs(jobs):
 def submit_job(job_uuid, job):
     response = requests.post(URI + "/jobs/" + str(job_uuid),
                              data=json.dumps(job),
-                             headers=HEADER)
+                             headers=HEADER,
+                             auth=AUTH)
     if response.status_code != 200:
         raise Exception("Error while submitting job to the API.\nServer response ({}): {}"
                         .format(response.status_code, response.text))
 
 
 def get_job(job_uuid):
-    response = requests.get(URI + "/jobs/" + str(job_uuid))
+    response = requests.get(URI + "/jobs/" + str(job_uuid), auth=AUTH)
     if response.status_code == 200:
         return json.loads(response.text)['result'][str(job_uuid)]
     else:
@@ -52,7 +54,7 @@ def get_job(job_uuid):
 
 
 def get_job_state(job_uuid):
-    response = requests.get(URI + "/jobs/" + str(job_uuid) + "/state")
+    response = requests.get(URI + "/jobs/" + str(job_uuid) + "/state", auth=AUTH)
     if response.status_code == 200:
         return json.loads(response.text)['result']
     else:

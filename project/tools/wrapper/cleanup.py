@@ -1,12 +1,13 @@
 import json
 import os
 import shutil
+from . import runtime_info
 
 
 def delete_exec_files():
-    os.remove('input.json')
-    os.remove('wrapper.tar.gz')
-    shutil.rmtree('wrapper')
+    os.remove(os.path.join(runtime_info.job_directory, 'input.json'))
+    os.remove(os.path.join(runtime_info.job_directory, 'wrapper.tar.gz'))
+    shutil.rmtree(os.path.join(runtime_info.job_directory, 'wrapper'))
 
 
 def write_file_output(input):

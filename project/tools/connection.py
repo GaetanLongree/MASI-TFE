@@ -12,7 +12,7 @@ from project.constants import WRAPPER_PATH
 
 
 def is_reachable(hostname):
-    # TODO manage is the System is not supported
+    # TODO manage if the System is not supported
 
     ping_cmd = "ping -n 1 " if os_family == 'Windows' else "ping -c 1 "
     # test if cluster is reachable beforehand
@@ -37,7 +37,7 @@ class Ssh:
         self.port = port
         self.username = username
         self.pkey_file = RSAKey.from_private_key_file(pkey_file, passphrase)
-        self.passphrase = passphrase    # TODO clear the passphrase pkeyfile location for security
+        self.passphrase = passphrase
         self.client = client.SSHClient()
 
     def __connect__(self):

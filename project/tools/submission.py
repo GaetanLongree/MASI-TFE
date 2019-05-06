@@ -9,8 +9,7 @@ import numpy
 
 from project import package_directory, current_directory
 from project.tools.connection import Ssh, is_reachable
-# from project.tools.dao import submissions
-# from project.tools.dao import inventory
+from project.tools.wrapper import workload_manager
 from project.tools import api_handler
 from project.tools.parser import Parser
 
@@ -85,7 +84,7 @@ class Submission:
             # search cluster with similar preferred jobs
             alt_clusters = api_handler.get_cluster_similar_jobs(original_target_preferred_jobs)
 
-            # TODO check if alternative are reachable instead of based on current target name
+            # check if alternative are reachable instead of based on current target name
             alt_clusters = [entry for entry in alt_clusters if is_reachable(entry['hostname'])]
 
             if len(alt_clusters) == 0:
@@ -152,8 +151,6 @@ class Submission:
         self.connection.run_command('cd ' + str(self.job_uuid) + ' \n python -m wrapper -i input.json')
 
     def __validate_input__(self, user_input, required=REQUIRED, optional=OPTIONAL, stage="user input file import"):
-        # TODO perform some kind of validation
-
         if not all(elem in user_input for elem in required):
             print("ERROR during {}: elements are missing from user input - minimum required: {}"
                   .format(stage, required))
@@ -195,15 +192,16 @@ class Submission:
         # manage results in an array
         job_state = api_handler.get_job_state(job_uuid)
         job_state = numpy.unique(job_state)
+        submission = api_handler.get_job(job_uuid)
 
-        if all(state == "COMPLETE" for state in job_state):
-            submission = api_handler.get_job(job_uuid)
+        wlm_handler = workload_manager.get(submission['destination_cluster']['workload_manager'])
 
-            if os.path.exists(submission['user_input']['private_key']):
+        if all(state in wlm_handler.TERMINATED_SUCCESSFULLY_STATUSES for state in job_state):
+            if 'private_key' in submission['user_input'] and os.path.exists(submission['user_input']['private_key']):
                 pkey_path = submission['user_input']['private_key']
             else:
                 valid = False
-                path = submission['user_input']['private_key']
+                path = ""
                 while not valid:
                     string = input("Original private key file not found at the original given location ({})\n"
                                    "Please enter the path to the private key file to connect to the cluster: "
@@ -234,13 +232,13 @@ class Submission:
                 elif isinstance(submission['user_input']['output'], list):
                     for output in submission['user_input']['output']:
                         # do list command compilation
-                        connection.__retrieve__(job_uuid, output, working_dir + output)
+                        connection.__retrieve__(job_uuid, output, working_dir + '/' + output)
         else:
             print("The job you're trying to retrieve has not completed yet\n"
                   "Current state of job: {}".format(job_state))
 
     def validate_aggregated_data(self):
-        # TODO verify that user input contains all the needed information (prompt user to correct and continue?)
+        # verify that user input contains all the needed information (prompt user to correct and continue?)
         if self.__validate_input__(self.aggregated_data['user_input'],
                                    required=self.AGGREGATED_REQUIRED,
                                    optional=self.AGGREGATED_OPTIONAL,

@@ -26,9 +26,9 @@ def __gather_facts__():
     facts['os'] = os
     facts['cluster'] = workload_manager.get(runtime_info.destination_cluster['workload_manager']).get_cluster_resources()
     runtime_info.__update_cluster_status__(facts['cluster'])
-    api_communicator.update_cluster_status()
     runtime_info.__update_facts__(facts)
-    # TODO POST to API
+    # POST to API
+    api_communicator.update_cluster_status()
 
 
 def __execute_requirements__():
@@ -39,9 +39,11 @@ def __execute_requirements__():
             output, err = process.communicate()
             return_code = process.returncode
             if return_code is not 0:
-                debug.log("ERROR: command {} of requirements returned a non-zero return code" + \
+                err_msg = "ERROR: command {} of requirements returned a non-zero return code" + \
                           "\nOutput: {}" + \
-                          "\nError: {}".format(command, output, err))
+                          "\nError: {}".format(command, output, err)
+                debug.log(err_msg)
+                api_communicator.notify_client(err_msg)
 
 
 def __prep_job__():
@@ -53,9 +55,11 @@ def __prep_job__():
             output, err = process.communicate()
             return_code = process.returncode
             if return_code is not 0:
-                debug.log("ERROR: cloning job through GIT returned a non-zero return code" + \
+                err_msg = "ERROR: cloning job through GIT returned a non-zero return code" + \
                           "\nOutput: {}" + \
-                          "\nError: {}".format(output, err))
+                          "\nError: {}".format(output, err)
+                debug.log(err_msg)
+                api_communicator.notify_client(err_msg)
                 raise Exception("ERROR: cloning job through GIT returned a non-zero return code")
 
             # get repo name
@@ -71,9 +75,11 @@ def __prep_job__():
         output, err = process.communicate()
         return_code = process.returncode
         if return_code is not 0:
-            debug.log("ERROR: tarfile extraction returned a non-zero return code" + \
+            err_msg = "ERROR: tarfile extraction returned a non-zero return code" + \
                       "\nOutput: {}" + \
-                      "\nError: {}".format(output, err))
+                      "\nError: {}".format(output, err)
+            debug.log(err_msg)
+            api_communicator.notify_client(err_msg)
             raise Exception("ERROR: tarfile extraction returned a non-zero return code")
 
         os.chdir(runtime_info.user_input['job'])
@@ -86,9 +92,11 @@ def __prep_job__():
             output, err = process.communicate()
             return_code = process.returncode
             if return_code is not 0:
-                debug.log("ERROR: command {} of compilation returned a non-zero return code" + \
+                err_msg = "ERROR: command {} of compilation returned a non-zero return code" + \
                           "\nOutput: {}" + \
-                          "\nError: {}".format(command, output, err))
+                          "\nError: {}".format(command, output, err)
+                debug.log(err_msg)
+                api_communicator.notify_client(err_msg)
 
         if len(runtime_info.user_input['compilation']) > 0:
             if isinstance(runtime_info.user_input['compilation'], str):
@@ -102,9 +110,6 @@ def __prep_job__():
 
 def run(input_file):
     __import_input__(input_file)
-    # debug.log(json.dumps(runtime_info.user_input, indent=4))
     __gather_facts__()
     __prep_job__()
     __execute_requirements__()
-    # debug.log(runtime_info.user_input)
-    # debug.log(runtime_info.facts)

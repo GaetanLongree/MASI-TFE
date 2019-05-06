@@ -12,7 +12,10 @@ def get(workload_manager):
     if workload_manager == 'slurm':
         return Slurm
     else:
-        raise Exception("Unknown workload manager: {}".format(workload_manager))
+        err_msg = "Unknown workload manager: {}".format(workload_manager)
+        debug.log(err_msg)
+        api_communicator.notify_client(err_msg)
+        raise Exception(err_msg)
 
 
 def parse(workload_manager, destination_cluster, resources, commands):
@@ -116,7 +119,9 @@ class Slurm(object):
 
             return cluster
         else:
-            debug.log("ERROR: Gathering Slurm cluster stats returned non-zero error code.")
+            err_msg = "ERROR: Gathering Slurm cluster stats returned non-zero error code."
+            debug.log(err_msg)
+            api_communicator.notify_client(err_msg)
 
     @staticmethod
     def get_job_status():
@@ -150,68 +155,73 @@ class Slurm(object):
                                 job_submission[row[0]][output[0][i]].append(row[i])
 
             return job_submission
+        else:
+            err_msg = "Error encountered while getting status information for job ID: {}".format(runtime_info.job_uuid)
+            debug.log(err_msg)
+            api_communicator.notify_client(err_msg)
 
     @staticmethod
     def get_job_states(job_status):
         try:
             return job_status[runtime_info.job_uuid]['State']
         except KeyError:
-            return {}  # TODO if empty --> get info from sacct
+            return {}
 
     @staticmethod
     def create_script(destination_cluster, resources, commands):
-        # TODO handle if resources are empty
         # Based on the existing tool at http://www.ceci-hpc.be/scriptgen.html
         script = "#!/bin/bash\n"
         # Job Name == Job UUID
         script += "#SBATCH --job-name=" + runtime_info.job_uuid + "\n"
 
-        # Job duration
-        timestamp = parse_duration(resources['duration'])
-        if 'duration' in resources:
-            script += "#SBATCH --time=" + timestamp + "\n"
+        # handle if resources are empty
+        if resources is not None and len(resources) > 0:
+            # Job duration
+            timestamp = parse_duration(resources['duration'])
+            if 'duration' in resources:
+                script += "#SBATCH --time=" + timestamp + "\n"
 
-        # Embarrassingly parallel jobs
-        if 'nbr_jobs_in_array' in resources:
-            script += "#SBATCH --array=1-" + str(resources['nbr_jobs_in_array']) + "\n"
+            # Embarrassingly parallel jobs
+            if 'nbr_jobs_in_array' in resources:
+                script += "#SBATCH --array=1-" + str(resources['nbr_jobs_in_array']) + "\n"
 
-        # Shared Memory / OpenMP jobs
-        if 'nbr_threads_per_process' in resources:
-            script += "#SBATCH --cpus-per-task=" + str(resources['nbr_threads_per_process']) + "\n"
+            # Shared Memory / OpenMP jobs
+            if 'nbr_threads_per_process' in resources:
+                script += "#SBATCH --cpus-per-task=" + str(resources['nbr_threads_per_process']) + "\n"
 
-        # Message passing / MPI jobs
-        if 'nbr_processes' in resources:
-            script += "#SBATCH --ntasks=" + str(resources['nbr_processes']) + "\n"
-            if 'distribution' in resources:
-                if resources['distribution'] == 'grouped':
-                    script += "#SBATCH --nodes=1\n"
-                elif resources['distribution'] == 'scattered':
-                    script += "#SBATCH --ntasks-per-node=1\n"
-                elif resources['distribution'] == 'distributed' and 'nbr_of_nodes' in resources:
-                    script += "#SBATCH --ntasks-per-node=1\n"
-                    script += "#SBATCH --nodes=" + str(resources['nbr_of_nodes']) + "\n"
-        else:
-            script += "#SBATCH --ntasks=1\n"
+            # Message passing / MPI jobs
+            if 'nbr_processes' in resources:
+                script += "#SBATCH --ntasks=" + str(resources['nbr_processes']) + "\n"
+                if 'distribution' in resources:
+                    if resources['distribution'] == 'grouped':
+                        script += "#SBATCH --nodes=1\n"
+                    elif resources['distribution'] == 'scattered':
+                        script += "#SBATCH --ntasks-per-node=1\n"
+                    elif resources['distribution'] == 'distributed' and 'nbr_of_nodes' in resources:
+                        script += "#SBATCH --ntasks-per-node=1\n"
+                        script += "#SBATCH --nodes=" + str(resources['nbr_of_nodes']) + "\n"
+            else:
+                script += "#SBATCH --ntasks=1\n"
 
-        # Memory
-        memory = parse_mem(resources['memory_per_thread'])
-        if 'memory_per_thread' in resources:
-            script += "#SBATCH --mem-per-cpu=" + str(memory) + "\n"
+            # Memory
+            memory = parse_mem(resources['memory_per_thread'])
+            if 'memory_per_thread' in resources:
+                script += "#SBATCH --mem-per-cpu=" + str(memory) + "\n"
 
-        # Cluster specific values
-        if 'partition' in destination_cluster:
-            script += "#SBATCH --partition=" + destination_cluster['partition'] + "\n"
+            # Cluster specific values
+            if 'partition' in destination_cluster:
+                script += "#SBATCH --partition=" + destination_cluster['partition'] + "\n"
 
-        script += "\n"
+            script += "\n"
 
-        # Final values
-        if 'nbr_threads_per_process' in resources:
-            script += "export OMP_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n" \
-                      + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
-        if 'nbr_jobs_in_array' in resources:
-            script += "echo 'Task ID: $SLURM_ARRAY_TASK_ID'\n"
+            # Final values
+            if 'nbr_threads_per_process' in resources:
+                script += "export OMP_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n" \
+                          + "export MKL_NUM_THREADS=" + str(resources['nbr_threads_per_process']) + "\n"
+            if 'nbr_jobs_in_array' in resources:
+                script += "echo 'Task ID: $SLURM_ARRAY_TASK_ID'\n"
 
-        script += "\n"
+            script += "\n"
 
         # Commands
         if len(commands) > 0:

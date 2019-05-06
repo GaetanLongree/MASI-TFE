@@ -32,12 +32,12 @@ def run():
             job_id = re.search(r"(?<=job )\b(\d*)", output).group(1)
             runtime_info.__update_working_dir__(os.getcwd())
         else:
-            debug.log("ERROR: running slurm job - sbatch returned a non-zero return code" + \
+            err_msg = "ERROR: running slurm job - sbatch returned a non-zero return code" + \
                       "\nOutput: {}" + \
-                      "\nError: {}".format(output, err))
-            raise Exception("ERROR: running slurm job - sbatch returned a non-zero return code" + \
-                            "\nOutput: {}" + \
-                            "\nError: {}".format(output, err))
+                      "\nError: {}".format(output, err)
+            debug.log(err_msg)
+            api_communicator.notify_client(err_msg)
+            raise Exception(err_msg)
 
 
 def __status_comparator__(statuses, values):
@@ -67,11 +67,11 @@ def wait():
         if unique_statuses != prev_statuses:
             api_communicator.update_job_status()
             if any(status in wlm_handler.WAITING_STATUSES for status in unique_statuses):
-                api_communicator.notify_client(unique_statuses)
+                api_communicator.notify_client_state_change(unique_statuses)
             elif any(status in wlm_handler.RUNNING_STATUSES for status in unique_statuses):
-                api_communicator.notify_client(unique_statuses)
+                api_communicator.notify_client_state_change(unique_statuses)
             else:
-                api_communicator.notify_client(unique_statuses)
+                api_communicator.notify_client_state_change(unique_statuses)
 
         time.sleep(5)
 
@@ -85,8 +85,8 @@ def wait():
     api_communicator.update_job_status()
 
     if any(status in wlm_handler.TERMINATED_SUCCESSFULLY_STATUSES for status in unique_statuses):
-        api_communicator.notify_client(unique_statuses)
+        api_communicator.notify_client_state_change(unique_statuses)
         return True
     else:
-        api_communicator.notify_client(unique_statuses)
+        api_communicator.notify_client_state_change(unique_statuses)
         return False

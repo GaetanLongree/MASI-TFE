@@ -1,9 +1,8 @@
 import getopt
-import json
 import sys
 import traceback
 
-from . import debug, setup, cleanup, execution, runtime_info, workload_manager, module_handler
+from . import debug, setup, cleanup, execution, runtime_info, workload_manager, module_handler, api_communicator
 
 
 def main(argv):
@@ -28,11 +27,15 @@ def main(argv):
             handler = module_handler.ModuleHandler()
             handler.from_dict(runtime_info.modules)
 
-            # Preprocessing modules execution
+            #  modules execution
             if runtime_info.modules is not None:
-                preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
-                runtime_info.__update_input__(preprocessing_output['input'])
-                runtime_info.__update_modules__(preprocessing_output['modules'])
+                try:
+                    preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
+                    runtime_info.__update_input__(preprocessing_output['input'])
+                    runtime_info.__update_modules__(preprocessing_output['modules'])
+                except Exception as err_msg:
+                    debug.log(err_msg)
+                    api_communicator.notify_client(err_msg)
 
             # Job Execution
             execution.run()
@@ -40,17 +43,21 @@ def main(argv):
             terminated_successfully = execution.wait()
 
             if terminated_successfully and runtime_info.modules is not None:
-            #if True and runtime_info.modules is not None:
                 # Postprocessing modules execution
-                postprocessing_output = handler.run('postprocessing', runtime_info.user_input)
-                runtime_info.__update_input__(postprocessing_output['input'])
-                runtime_info.__update_modules__(postprocessing_output['modules'])
+                try:
+                    postprocessing_output = handler.run('postprocessing', runtime_info.user_input)
+                    runtime_info.__update_input__(postprocessing_output['input'])
+                    runtime_info.__update_modules__(postprocessing_output['modules'])
+                except Exception as err_msg:
+                    debug.log(err_msg)
+                    api_communicator.notify_client(err_msg)
 
+            # Last Status update of the job
+            api_communicator.update_job_status()
             # Cleanup of local files
-            #cleanup.run()
-            cleanup.write_file_output(runtime_info.get_all())
-            debug.log("\n" + json.dumps(runtime_info.get_all(), indent=6, sort_keys=True))
-        except Exception as error:
+            cleanup.run(runtime_info.get_all())
+        except BaseException as error:
+            # api_communicator.notify_client("Error caught: {}".format(error))
             debug.log("Error caught: {}".format(error))
             debug.log("Traceback : {}".format(traceback.format_exc()))
 
