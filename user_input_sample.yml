@@ -6,7 +6,8 @@ destination_cluster: lemaitre3
 requirements:
   - "chmod +x job"
 job: https://github.com/GaetanLongree/test.git
-#compilation:
+compilation:
+  - "gcc job.c"
 execution:
   - "srun ./job"
 output:

@@ -104,7 +104,7 @@ venv.bak/
 .mypy_cache/
 .idea/
 project/db.json
-project/data/user_input.yml
+project/data/
 project/tools/wrapper/module_handler.py
 project/tools/wrapper/parser.py
 result.txt
