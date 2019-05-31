@@ -1,10 +1,11 @@
+import os
 import shlex
 import subprocess
 import time
 
 import numpy
 
-from . import runtime_info, debug
+from . import runtime_info, debug, api_communicator
 import re
 
 
@@ -16,10 +17,6 @@ def get(workload_manager):
         debug.log(err_msg)
         api_communicator.notify_client(err_msg)
         raise Exception(err_msg)
-
-
-def parse(workload_manager, destination_cluster, resources, commands):
-    return get(workload_manager).create_script(destination_cluster, resources, commands)
 
 
 def parse_duration(param):
@@ -71,13 +68,13 @@ class Slurm(object):
 
     @staticmethod
     def get_cluster_resources():
-        process = subprocess.Popen(shlex.split('sinfo -N --format="%N;%a;%b;%c;%z;%O;%m;%e"'),
+        process = subprocess.Popen(shlex.split('sinfo -N --format="%n;%a;%c;%z;%O;%m"'),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, err = process.communicate()
         return_code = process.returncode
 
         if return_code == 0:
-            output = output.split('\n')
+            output = output.decode().split('\n')
             cluster = dict()
             nodes = dict()
             for row, i in zip(output, range(0, len(output))):
@@ -130,8 +127,8 @@ class Slurm(object):
         #                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         process = subprocess.Popen(shlex.split('sacct --name=' + runtime_info.job_uuid + \
-                                               ' --format=JobName,JobID,NNodes,NodeList,AllocTRES,ReqTRES,CPUTime,'
-                                               'Elapsed,NCPUS,WorkDir,State,ExitCode --parsable2'),
+                                               ' --format=JobName,JobID,NNodes,NodeList,CPUTime,'
+                                               'Elapsed,NCPUS,State,ExitCode --parsable2'),
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output, err = process.communicate()
         return_code = process.returncode
@@ -231,4 +228,29 @@ class Slurm(object):
                 for command in commands:
                     script += command + "\n"
 
-        return script
+        with open('submit.sh', 'w') as file:
+            file.write(script)
+            file.close()
+
+        return 'submit.sh'
+
+    @staticmethod
+    def submit_job():
+        if os.path.exists("submit.sh"):
+            process = subprocess.Popen(shlex.split("sbatch submit.sh"),
+                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output, err = process.communicate()
+            return_code = process.returncode
+
+            if return_code == 0:
+                # TODO manage for multiple JOB IDs being returned
+                job_id = re.search(r"(?<=job )\b(\d*)", output).group(1)
+                return return_code, job_id
+            else:
+                err_msg = "ERROR: running slurm job - sbatch returned a non-zero return code" + \
+                          "\nOutput: {}" + \
+                          "\nError: {}".format(output, err)
+                debug.log(err_msg)
+                api_communicator.notify_client(err_msg)
+                raise Exception(err_msg)
+
