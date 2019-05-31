@@ -3,6 +3,7 @@ import json
 import os
 import re
 import tarfile
+import time
 import uuid
 
 import numpy
@@ -79,36 +80,41 @@ class Submission:
         while not self.connection.__connect__():
             print("Unable to connect to cluster {} ({}), the cluster is unreachable".format(
                 self.destination_cluster['name'], self.destination_cluster['hostname']))
-            print("Searching for available clusters...")
-
-            # search cluster with similar preferred jobs
-            alt_clusters = api_handler.get_cluster_similar_jobs(original_target_preferred_jobs)
-
-            # check if alternative are reachable instead of based on current target name
-            alt_clusters = [entry for entry in alt_clusters if is_reachable(entry['hostname'])]
-
-            if len(alt_clusters) == 0:
-                print("No clusters with similar job preferences were found")
-                self.input['destination_cluster'] = input("Please enter the name of a new destination cluster: ")
-                self.destination_cluster = api_handler.get_cluster(self.input['destination_cluster'])
-                if self.destination_cluster is None:
-                    raise Exception(
-                        "Cluster {} not present in database.".format(self.input['destination_cluster']))
+            choice = input("Do you still wish to connect? (not recommended) [Y|N]")
+            if choice in ('y', 'Y'):
+                self.connection.__connect_unreachable__()
+                break
             else:
-                print("We found clusters with similar job preferences based on your original target")
-                for i in range(0, len(alt_clusters)):
-                    print("\t{} - {} - preferred jobs: {}".format(i + 1, alt_clusters[i]['name'],
-                                                                  alt_clusters[i]['preferred_jobs']))
-                choice = input("Enter the nbr of the new destination cluster [1-{}]: ".format(len(alt_clusters)))
-                self.destination_cluster = alt_clusters[int(choice) - 1]
-                self.input['destination_cluster'] = self.destination_cluster['name']
+                print("Searching for available clusters...")
 
-            self.connection = Ssh(
-                self.destination_cluster['hostname'],
-                self.destination_cluster['port'],
-                self.input['username'],
-                self.input['private_key'],
-                passphrase)
+                # search cluster with similar preferred jobs
+                alt_clusters = api_handler.get_cluster_similar_jobs(original_target_preferred_jobs)
+
+                # check if alternative are reachable instead of based on current target name
+                alt_clusters = [entry for entry in alt_clusters if is_reachable(entry['hostname'])]
+
+                if len(alt_clusters) == 0:
+                    print("No clusters with similar job preferences were found")
+                    self.input['destination_cluster'] = input("Please enter the name of a new destination cluster: ")
+                    self.destination_cluster = api_handler.get_cluster(self.input['destination_cluster'])
+                    if self.destination_cluster is None:
+                        raise Exception(
+                            "Cluster {} not present in database.".format(self.input['destination_cluster']))
+                else:
+                    print("We found clusters with similar job preferences based on your original target")
+                    for i in range(0, len(alt_clusters)):
+                        print("\t{} - {} - preferred jobs: {}".format(i + 1, alt_clusters[i]['name'],
+                                                                      alt_clusters[i]['preferred_jobs']))
+                    choice = input("Enter the nbr of the new destination cluster [1-{}]: ".format(len(alt_clusters)))
+                    self.destination_cluster = alt_clusters[int(choice) - 1]
+                    self.input['destination_cluster'] = self.destination_cluster['name']
+
+                self.connection = Ssh(
+                    self.destination_cluster['hostname'],
+                    self.destination_cluster['port'],
+                    self.input['username'],
+                    self.input['private_key'],
+                    passphrase)
 
         self.connection.__prep_remote_env__(self.job_uuid)
 
@@ -142,13 +148,66 @@ class Submission:
             file.write(json.dumps(self.aggregated_data))
             file.close()
 
-        self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
-        self.connection.__transfer_wrapper__()
-        self.connection.run_command('tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
-        # pip install must be run in foreground to install dependencies
-        self.connection.run_command_foreground(
-            'pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
-        self.connection.run_command('cd ' + str(self.job_uuid) + ' \n python -m wrapper -i input.json')
+        # Check if the Python version 2.7 is available on destination cluster
+        python_version = None
+        while python_version is None:
+            python_version = self.connection.run_command_foreground("python --version 2>&1")
+            print(python_version)
+        regex_version = r"^Python\ 2\.7.*?$"
+        matches = re.findall(regex_version, python_version.decode("utf-8"), re.MULTILINE)
+        print(matches)
+
+        if len(matches) > 0:
+            while not os.path.exists(os.path.join(package_directory, 'input.json')):
+                time.sleep(1)
+                print(os.path.exists(os.path.join(package_directory, 'input.json')))
+            self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
+            self.connection.__transfer_wrapper__()
+            self.connection.run_command(
+                'tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
+
+            # pip install must be run in foreground to install dependencies
+            self.connection.run_command_foreground(
+                'python -m pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt ' +
+                ' || pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
+            self.connection.run_command('cd ' + str(self.job_uuid) + ' \n ' +
+                                        'python -m wrapper -i input.json')
+
+        else:
+            # if python 2.7 is not preinstalled, check if it can be loaded
+            matches = []
+            for entry in ("Python/2.7", "python/2.7"):
+                python_versions = None
+                while python_versions is None:
+                    python_versions = self.connection.run_command_foreground("module avail " + entry +
+                                                                             " -t 2>&1 \n sleep 1")
+                    print(python_versions)
+
+                regex = r"^python\/2\.7.*?$"
+                temp_matches = re.findall(regex, python_versions.decode("utf-8"), re.MULTILINE | re.IGNORECASE)
+                matches += temp_matches
+            print(matches)
+
+            if len(matches) > 0:
+                self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
+                self.connection.__transfer_wrapper__()
+                self.connection.run_command(
+                    'tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
+
+                # pip install must be run in foreground to install dependencies
+                self.connection.run_command_foreground(
+                    'module load ' + matches[0] + ' \n ' +
+                    'curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py \n ' +
+                    'python get-pip.py \n ' +
+                    'python -m pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt ' +
+                    ' || pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
+                self.connection.run_command('cd ' + str(self.job_uuid) + ' \n ' +
+                                            'module load ' + matches[0] + ' \n ' +
+                                            'python -m wrapper -i input.json')
+            else:
+                raise Exception("The destination cluster ({}) does not support Python version 2.7, please select "
+                                "another destination cluster".format(
+                                            self.aggregated_data['destination_cluster']['name']))
 
     def __validate_input__(self, user_input, required=REQUIRED, optional=OPTIONAL, stage="user input file import"):
         if not all(elem in user_input for elem in required):
@@ -219,7 +278,8 @@ class Submission:
                 submission['user_input']['username'],
                 pkey_path,
                 passphrase)
-            connection.__connect__()
+            if not connection.__connect__():
+                connection.__connect_unreachable__()
 
             # use data received from Wrapper with the job directory
             working_dir = submission['working_directory']

@@ -1,6 +1,8 @@
 import os
 import subprocess
 import io
+import time
+
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
@@ -65,6 +67,20 @@ class Ssh:
         else:
             return False
 
+    def __connect_unreachable__(self):
+        # Allow auto adding is host is not known
+        self.client.set_missing_host_key_policy(client.AutoAddPolicy())
+
+        # test if cluster is reachable beforehand
+        self.client.connect(
+            hostname=self.address,
+            port=self.port,
+            username=self.username,
+            pkey=self.pkey_file,
+            passphrase=self.passphrase,
+            look_for_keys=False
+        )
+
     def __prep_remote_env__(self, job_uuid):
         self.run_command('mkdir ' + str(job_uuid))
         self.remote_path = str(job_uuid) + '/'
@@ -124,6 +140,7 @@ class Ssh:
                     result = stdout.channel.recv(1024)
                     while stdout.channel.recv_ready():
                         result += stdout.channel.recv(1024)
-                    return str(result)
+                    #result = stdout.read()
+                    return result
         else:
             raise Exception("Cannot run command if no connection has been established")

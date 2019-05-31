@@ -69,7 +69,7 @@ class ModuleHandler:
 
             # compile the module if needed
             if 'compilation' in module and module['compilation'] is not None:
-                compilation_cmd = module['compilation'] + ' ' + module['module']
+                compilation_cmd = module['compilation']
                 output = self.__exec_cmd__(compilation_cmd, stage, module)
 
             # run the module based on execution
