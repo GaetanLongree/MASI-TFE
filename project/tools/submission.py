@@ -116,10 +116,19 @@ class Submission:
                     self.input['private_key'],
                     passphrase)
 
-        self.connection.__prep_remote_env__(self.job_uuid)
+        # Get the remote home path
+        cluster_home_var = "$CECIHOME"  # TODO get this from the DB
+        # this is necessary because the CECIHOME variable is not sources on non-interactive shells
+        # TODO fix the fact that ECHO is not executed on Hercules and the binary is not located at the same place on all clusters
+        command = "sleep 1 && source /etc/profile.d/ceci.sh && echo " + cluster_home_var
+        remote_home_path = None
+        while remote_home_path is None:
+            remote_home_path = self.connection.run_command_foreground(command)
+        remote_home_path = remote_home_path.decode("utf-8").split("\r\n")[-2]
+
+        self.connection.__prep_remote_env__(self.job_uuid, remote_home_path)
 
     def run(self):
-
         # check if job is a local file or a directory
         if not self.ONLINE_JOB_FILE:
             if os.path.isdir(self.input['job']):
@@ -152,25 +161,22 @@ class Submission:
         python_version = None
         while python_version is None:
             python_version = self.connection.run_command_foreground("python --version 2>&1")
-            print(python_version)
         regex_version = r"^Python\ 2\.7.*?$"
         matches = re.findall(regex_version, python_version.decode("utf-8"), re.MULTILINE)
-        print(matches)
 
         if len(matches) > 0:
             while not os.path.exists(os.path.join(package_directory, 'input.json')):
                 time.sleep(1)
-                print(os.path.exists(os.path.join(package_directory, 'input.json')))
             self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
             self.connection.__transfer_wrapper__()
             self.connection.run_command(
-                'tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
+                'tar zxf ' + self.connection.remote_path + 'wrapper.tar.gz -C ' + self.connection.remote_path)
 
             # pip install must be run in foreground to install dependencies
             self.connection.run_command_foreground(
-                'python -m pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt ' +
-                ' || pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
-            self.connection.run_command('cd ' + str(self.job_uuid) + ' \n ' +
+                'python -m pip install --user -r ' + self.connection.remote_path + 'wrapper/requirements.txt ' +
+                ' || pip install --user -r ' + self.connection.remote_path + 'wrapper/requirements.txt')
+            self.connection.run_command('cd ' + self.connection.remote_path + ' \n ' +
                                         'python -m wrapper -i input.json')
 
         else:
@@ -181,27 +187,25 @@ class Submission:
                 while python_versions is None:
                     python_versions = self.connection.run_command_foreground("module avail " + entry +
                                                                              " -t 2>&1 \n sleep 1")
-                    print(python_versions)
 
                 regex = r"^python\/2\.7.*?$"
                 temp_matches = re.findall(regex, python_versions.decode("utf-8"), re.MULTILINE | re.IGNORECASE)
                 matches += temp_matches
-            print(matches)
 
             if len(matches) > 0:
                 self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
                 self.connection.__transfer_wrapper__()
                 self.connection.run_command(
-                    'tar zxf ' + str(self.job_uuid) + '/wrapper.tar.gz -C ' + str(self.job_uuid) + '/')
+                    'tar zxf ' + self.connection.remote_path + 'wrapper.tar.gz -C ' + self.connection.remote_path)
 
                 # pip install must be run in foreground to install dependencies
                 self.connection.run_command_foreground(
                     'module load ' + matches[0] + ' \n ' +
                     'curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py \n ' +
                     'python get-pip.py \n ' +
-                    'python -m pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt ' +
-                    ' || pip install --user -r ' + str(self.job_uuid) + '/wrapper/requirements.txt')
-                self.connection.run_command('cd ' + str(self.job_uuid) + ' \n ' +
+                    'python -m pip install --user -r ' + self.connection.remote_path + 'wrapper/requirements.txt ' +
+                    ' || pip install --user -r ' + self.connection.remote_path + 'wrapper/requirements.txt')
+                self.connection.run_command('cd ' + self.connection.remote_path + ' \n ' +
                                             'module load ' + matches[0] + ' \n ' +
                                             'python -m wrapper -i input.json')
             else:

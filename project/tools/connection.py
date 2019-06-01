@@ -81,9 +81,10 @@ class Ssh:
             look_for_keys=False
         )
 
-    def __prep_remote_env__(self, job_uuid):
+    def __prep_remote_env__(self, job_uuid, remote_home_path):
         self.run_command('mkdir ' + str(job_uuid))
-        self.remote_path = str(job_uuid) + '/'
+        self.remote_path = remote_home_path + '/' + str(job_uuid) + '/'
+        self.run_command_foreground("mkdir " + self.remote_path)
 
     def __close__(self):
         if self.client:
@@ -134,7 +135,7 @@ class Ssh:
 
     def run_command_foreground(self, command):
         if self.client:
-            stdin, stdout, stderr = self.client.exec_command(command)
+            stdin, stdout, stderr = self.client.exec_command(command, get_pty=True)
             while not stdout.channel.exit_status_ready():
                 if stdout.channel.exit_status_ready():
                     result = stdout.channel.recv(1024)
@@ -142,5 +143,13 @@ class Ssh:
                         result += stdout.channel.recv(1024)
                     #result = stdout.read()
                     return result
+        else:
+            raise Exception("Cannot run command if no connection has been established")
+
+    def run_command_fg_interactive(self, command):
+        if self.client:
+            channel = self.client.invoke_shell()
+            channel.send(command)
+            return channel.recv(1024)
         else:
             raise Exception("Cannot run command if no connection has been established")
