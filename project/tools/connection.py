@@ -84,6 +84,7 @@ class Ssh:
     def __prep_remote_env__(self, job_uuid):
         self.run_command('mkdir ' + str(job_uuid))
         self.remote_path = str(job_uuid) + '/'
+        self.run_command_foreground("mkdir " + self.remote_path)
 
     def __close__(self):
         if self.client:

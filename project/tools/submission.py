@@ -152,10 +152,8 @@ class Submission:
         python_version = None
         while python_version is None:
             python_version = self.connection.run_command_foreground("python --version 2>&1")
-            print(python_version)
         regex_version = r"^Python\ 2\.7.*?$"
         matches = re.findall(regex_version, python_version.decode("utf-8"), re.MULTILINE)
-        print(matches)
 
         if len(matches) > 0:
             while not os.path.exists(os.path.join(package_directory, 'input.json')):
@@ -181,12 +179,9 @@ class Submission:
                 while python_versions is None:
                     python_versions = self.connection.run_command_foreground("module avail " + entry +
                                                                              " -t 2>&1 \n sleep 1")
-                    print(python_versions)
-
                 regex = r"^python\/2\.7.*?$"
                 temp_matches = re.findall(regex, python_versions.decode("utf-8"), re.MULTILINE | re.IGNORECASE)
                 matches += temp_matches
-            print(matches)
 
             if len(matches) > 0:
                 self.connection.__transfer__('input.json', os.path.join(package_directory, ''))
