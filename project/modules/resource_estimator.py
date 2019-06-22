@@ -6,7 +6,8 @@ if __name__ == "__main__":
     input_str = sys.argv[1]
     user_input = json.loads(input_str)
 
-    time.sleep(300)
+    # simulate a very complex AI doing complex work...very quickly
+    time.sleep(10) 
 
     if 'key1' in user_input['kwargs']:
         resources = {

@@ -28,7 +28,8 @@ def main(argv):
             handler.from_dict(runtime_info.modules)
 
             #  modules execution
-            if runtime_info.modules is not None:
+            if runtime_info.modules is not None \
+                    and 'preprocessing' in runtime_info.modules:
                 try:
                     preprocessing_output = handler.run('preprocessing', runtime_info.user_input)
                     runtime_info.__update_input__(preprocessing_output['input'])
@@ -42,7 +43,9 @@ def main(argv):
             # Wait for slurm to finish running the job
             terminated_successfully = execution.wait()
 
-            if terminated_successfully and runtime_info.modules is not None:
+            if terminated_successfully \
+                    and runtime_info.modules is not None \
+                    and 'postprocessing' in runtime_info.modules:
                 # Postprocessing modules execution
                 try:
                     postprocessing_output = handler.run('postprocessing', runtime_info.user_input)

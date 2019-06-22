@@ -10,6 +10,7 @@ try:
     from project import package_directory
 except ImportError:
     from . import runtime_info
+
     package_directory = runtime_info.job_directory
 
 try:
@@ -90,22 +91,24 @@ class ModuleHandler:
 
     def prep_remote(self, modules=True):
         if modules:
-            # dat list comprehension tho
             remote_stages = ['preprocessing', 'postprocessing']
-            remote_modules = [self.__modules__[stage][i + 1]['module']
-                              for stage in remote_stages
-                              for i in range(0, len(self.__modules__[stage]))]
+            remote_modules = None
+            for stage in remote_stages:
+                if stage in self.__modules__:
+                    remote_modules = [self.__modules__[stage][i + 1]['module']
+                                      for i in range(0, len(self.__modules__[stage]))]
 
-            remote_modules = numpy.unique(remote_modules)
+            if remote_modules is not None:
+                remote_modules = numpy.unique(remote_modules)
 
-            # create modules folder in wrapper
-            if os.path.isdir(os.path.join(WRAPPER_PATH, 'modules')):
-                shutil.rmtree(os.path.join(WRAPPER_PATH, 'modules'))
-            os.mkdir(os.path.join(WRAPPER_PATH, 'modules'))
-            # copy required modules to new folder
-            for module in remote_modules:
-                copyfile(os.path.join(package_directory, 'modules', module),
-                         os.path.join(WRAPPER_PATH, 'modules', module))
+                # create modules folder in wrapper
+                if os.path.isdir(os.path.join(WRAPPER_PATH, 'modules')):
+                    shutil.rmtree(os.path.join(WRAPPER_PATH, 'modules'))
+                os.mkdir(os.path.join(WRAPPER_PATH, 'modules'))
+                # copy required modules to new folder
+                for module in remote_modules:
+                    copyfile(os.path.join(package_directory, 'modules', module),
+                             os.path.join(WRAPPER_PATH, 'modules', module))
 
         # copy this file to the wrapper folder
         copyfile(__file__, os.path.join(WRAPPER_PATH, os.path.basename(__file__)))
