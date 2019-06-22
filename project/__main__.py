@@ -1,6 +1,7 @@
 import getopt
 import os
 import sys
+import traceback
 
 from project import app
 
@@ -59,6 +60,8 @@ def main(argv):
             print(cmd_helper())
     except BaseException as err:
         print(err)
+        # Uncomment for stacktrace
+        #traceback.print_exc()
 
 
 if __name__ == '__main__':
