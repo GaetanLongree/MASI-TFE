@@ -1,7 +1,9 @@
-# Master's Thesis - Henallux
+# Master's Thesis - "Automated Job Submission Management for Grid Computing"
 
 This repository contains the prototype for my Master's thesis realized at Henallux 
 for the [Master's in IT Systems Architecture](https://www.henallux.be/architecture-des-systemes-informatiques-master).
+
+The complete Master's Thesis, titled **Automated Job Submission Management for Grid Computing**, can be found [here](https://www.longree.be/data/tfe.pdf).
 
 ## Description
 
